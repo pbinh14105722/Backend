@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
-models.Base.metadata.create_all(bind=database.engine)
+#models.Base.metadata.create_all(bind=database.engine)
 
 # --- API ĐĂNG KÝ ---
 @app.post("/signup", response_model=schemas.UserResponse)
@@ -68,4 +68,5 @@ def get_current_user(token: str = Depends(database.oauth2_scheme)):
 # Đây là API bí mật
 @app.get("/users/me")
 def read_users_me(current_user_email: str = Depends(get_current_user)):
+
     return {"message": "Chào mừng bạn!", "user_email": current_user_email}

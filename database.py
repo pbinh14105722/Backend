@@ -6,6 +6,16 @@ from fastapi.security import OAuth2PasswordBearer
 # Tôi đã thêm ?sslmode=require vào cuối link để Render không chặn kết nối
 SQLALCHEMY_DATABASE_URL = "postgresql://postgres.quarzvpkrjjdhhnekwka:binh14105722@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require"
 
+# --- PHẦN SỬA ĐỔI QUAN TRỌNG Ở ĐÂY ---
+# Thêm connect_args={"connect_timeout": 30} để đợi 30 giây
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={
+        "connect_timeout": 30
+    }
+)
+# --------------------------------------
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -18,3 +28,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
+# Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
+models.Base.metadata.create_all(bind=database.engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,7 +20,6 @@ app.add_middleware(
 )
 
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
-#models.Base.metadata.create_all(bind=database.engine)
 
 # --- API ĐĂNG KÝ ---
 @app.post("/signup", response_model=schemas.UserResponse)

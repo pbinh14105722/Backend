@@ -11,6 +11,8 @@ app = FastAPI()
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
 models.Base.metadata.create_all(bind=database.engine)
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Cho phép tất cả các nguồn (trong thực tế nên chỉ định rõ domain)
@@ -51,7 +53,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Hàm này dùng để kiểm tra Token xem có hợp lệ không
-def get_current_user(token: str = Depends(database.oauth2_scheme)):
+def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Không thể xác thực thông tin",

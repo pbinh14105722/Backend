@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
-models.Base.metadata.create_all(bind=database.engine)
+#models.Base.metadata.create_all(bind=database.engine)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -123,3 +123,4 @@ def save_all_items(items: list[schemas.ItemCreate], db: Session = Depends(databa
 @app.get("/users/me")
 def read_users_me(current_user_email: str = Depends(get_current_user)):
     return {"message": "Chào mừng bạn!", "user_email": current_user_email}
+

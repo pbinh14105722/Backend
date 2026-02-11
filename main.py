@@ -65,8 +65,58 @@ def get_current_user(token: str = Depends(database.oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
+# --- BỔ SUNG LOGIC QUẢN LÝ FOLDER/PROJECT ---
+
+# 1. Lấy toàn bộ danh sách (Sắp xếp theo position)
+@app.get("/data", response_model=list[schemas.ItemResponse])
+def get_all_items(db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+    return db.query(models.Item).order_by(models.Item.position.asc()).all()
+
+# 2. Thêm mới một item
+@app.post("/items", response_model=schemas.ItemResponse)
+def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+    db_item = models.Item(**item.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+# 3. Cập nhật một item (Sửa tên, màu, trạng thái mở rộng hoặc kéo thả)
+@app.put("/items/{item_id}", response_model=schemas.ItemResponse)
+def update_item(item_id: str, item_data: schemas.ItemUpdate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+    db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy mục này")
+    
+    for key, value in item_data.model_dump(exclude_unset=True).items():
+        setattr(db_item, key, value)
+    
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+# 4. Xóa một item (Cascade delete sẽ tự xóa con nếu bạn config DB đúng)
+@app.delete("/items/{item_id}")
+def delete_item(item_id: str, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+    db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Không tìm thấy mục này")
+    
+    db.delete(db_item)
+    db.commit()
+    return {"message": "Đã xóa thành công"}
+
+# 5. Lưu toàn bộ cấu trúc (Dùng khi kéo thả số lượng lớn)
+@app.post("/save-all")
+def save_all_items(items: list[schemas.ItemCreate], db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+    # Xóa sạch bảng và ghi đè lại (Đơn giản nhất cho kéo thả)
+    db.query(models.Item).delete()
+    for item in items:
+        db.add(models.Item(**item.model_dump()))
+    db.commit()
+    return {"message": "Đã lưu toàn bộ cấu trúc"}
+
 # Đây là API bí mật
 @app.get("/users/me")
 def read_users_me(current_user_email: str = Depends(get_current_user)):
-
     return {"message": "Chào mừng bạn!", "user_email": current_user_email}

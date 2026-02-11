@@ -17,7 +17,7 @@ engine = create_engine(
         "keepalives_idle": 30,
         "keepalives_interval": 10,
         "keepalives_count": 5,
-        "connect_timeout": 120  # Đợi tối đa 120 giây
+        "connect_timeout": 50  # Đợi tối đa 50 giây
     }
 )
 # -----------------------------------------------------
@@ -33,3 +33,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

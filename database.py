@@ -10,8 +10,8 @@ SQLALCHEMY_DATABASE_URL = "postgresql://postgres.quarzvpkrjjdhhnekwka:binh141057
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,       # Kiểm tra kết nối trước khi dùng
-    pool_size=10,            # Nên giới hạn số lượng kết nối tới Supabase
-    max_overflow=20,
+#    pool_size=10,            # Nên giới hạn số lượng kết nối tới Supabase
+#    max_overflow=20,
     connect_args={
         "keepalives": 1,
         "keepalives_idle": 30,
@@ -33,5 +33,6 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 

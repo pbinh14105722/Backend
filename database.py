@@ -9,10 +9,9 @@ SQLALCHEMY_DATABASE_URL = "postgresql://postgres.quarzvpkrjjdhhnekwka:binh141057
 # --- THAY ĐỔI Ở ĐÂY: Tăng thời gian chờ lên 60 giây ---
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,
+    pool_pre_ping=True,       # Kiểm tra kết nối trước khi dùng
     pool_size=10,            # Nên giới hạn số lượng kết nối tới Supabase
     max_overflow=20,
-    pool_pre_ping=True,  # Kiểm tra kết nối trước khi dùng
     connect_args={
         "keepalives": 1,
         "keepalives_idle": 30,
@@ -26,7 +25,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+#oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def get_db():
     db = SessionLocal()

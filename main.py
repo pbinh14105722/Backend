@@ -71,10 +71,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 # --- BỔ SUNG LOGIC QUẢN LÝ FOLDER/PROJECT ---
 
 # 1. Lấy toàn bộ danh sách (Sắp xếp theo position)
-@app.get("/data")#, response_model=list[schemas.ItemResponse])
+@app.get("/data", response_model=list[schemas.ItemResponse])
 def get_all_items(db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    #return db.query(models.Item).order_by(models.Item.position.asc()).all()
-    return db.query(models.Item).filter(models.Item.owner_email == current_user).order_by(models.Item.position.asc()).all()
+    return db.query(models.Item).order_by(models.Item.position.asc()).all()
+    #return db.query(models.Item).filter(models.Item.owner_email == current_user).order_by(models.Item.position.asc()).all()
 
 # 2. Thêm mới một item
 @app.post("/items", response_model=schemas.ItemResponse)
@@ -124,4 +124,3 @@ def save_all_items(items: list[schemas.ItemCreate], db: Session = Depends(databa
 @app.get("/users/me")
 def read_users_me(current_user_email: str = Depends(get_current_user)):
     return {"message": "Chào mừng bạn!", "user_email": current_user_email}
-

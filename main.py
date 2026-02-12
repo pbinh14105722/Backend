@@ -68,29 +68,61 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
-# --- BỔ SUNG LOGIC QUẢN LÝ FOLDER/PROJECT ---
+# --- CÁC HÀM CRUD ĐÃ ĐƯỢC PHÂN QUYỀN ---
 
-# 1. Lấy toàn bộ danh sách (Sắp xếp theo position)
-@app.get("/data", response_model=list[schemas.ItemResponse])
-def get_all_items(db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    return db.query(models.Item).order_by(models.Item.position.asc()).all()
-    #return db.query(models.Item).filter(models.Item.owner_email == current_user).order_by(models.Item.position.asc()).all()
+# Hàm tiện ích: Lấy User Object từ Email (để dùng ID của nó)
+def get_user_from_token(db: Session, email: str):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User không tồn tại")
+    return user
 
-# 2. Thêm mới một item
+# 1. Lấy danh sách (CHỈ LẤY CỦA MÌNH)
+@app.get("/items", response_model=list[schemas.ItemResponse]) # Đổi /data thành /items cho chuẩn RESTful
+def get_my_items(
+    db: Session = Depends(database.get_db), 
+    current_user_email: str = Depends(get_current_user)
+):
+    # Tìm user hiện tại
+    user = get_user_from_token(db, current_user_email)
+    
+    # LỌC DỮ LIỆU: Chỉ lấy item có owner_id trùng với id của user
+    return db.query(models.Item).filter(models.Item.owner_id == user.id).order_by(models.Item.position.asc()).all()
+
+# 2. Thêm mới (TỰ ĐỘNG GÁN CHO MÌNH)
 @app.post("/items", response_model=schemas.ItemResponse)
-def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    db_item = models.Item(**item.model_dump())
+def create_item(
+    item: schemas.ItemCreate, 
+    db: Session = Depends(database.get_db), 
+    current_user_email: str = Depends(get_current_user)
+):
+    user = get_user_from_token(db, current_user_email)
+    
+    # Khi tạo, gán luôn owner_id = user.id
+    db_item = models.Item(**item.model_dump(), owner_id=user.id)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
     return db_item
 
-# 3. Cập nhật một item (Sửa tên, màu, trạng thái mở rộng hoặc kéo thả)
+# 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)
-def update_item(item_id: str, item_data: schemas.ItemUpdate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
+def update_item(
+    item_id: str, 
+    item_data: schemas.ItemUpdate, 
+    db: Session = Depends(database.get_db), 
+    current_user_email: str = Depends(get_current_user)
+):
+    user = get_user_from_token(db, current_user_email)
+    
+    # Tìm item, NHƯNG phải kèm điều kiện owner_id
+    db_item = db.query(models.Item).filter(
+        models.Item.id == item_id, 
+        models.Item.owner_id == user.id  # <-- Khóa bảo mật
+    ).first()
+    
     if not db_item:
-        raise HTTPException(status_code=404, detail="Không tìm thấy mục này")
+        raise HTTPException(status_code=404, detail="Không tìm thấy mục này (hoặc bạn không có quyền)")
     
     for key, value in item_data.model_dump(exclude_unset=True).items():
         setattr(db_item, key, value)
@@ -99,28 +131,23 @@ def update_item(item_id: str, item_data: schemas.ItemUpdate, db: Session = Depen
     db.refresh(db_item)
     return db_item
 
-# 4. Xóa một item (Cascade delete sẽ tự xóa con nếu bạn config DB đúng)
+# 4. Xóa (CHỈ XÓA ĐƯỢC CỦA MÌNH)
 @app.delete("/items/{item_id}")
-def delete_item(item_id: str, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
+def delete_item(
+    item_id: str, 
+    db: Session = Depends(database.get_db), 
+    current_user_email: str = Depends(get_current_user)
+):
+    user = get_user_from_token(db, current_user_email)
+    
+    db_item = db.query(models.Item).filter(
+        models.Item.id == item_id, 
+        models.Item.owner_id == user.id # <-- Khóa bảo mật
+    ).first()
+    
     if not db_item:
         raise HTTPException(status_code=404, detail="Không tìm thấy mục này")
     
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
-
-# 5. Lưu toàn bộ cấu trúc (Dùng khi kéo thả số lượng lớn)
-@app.post("/save-all")
-def save_all_items(items: list[schemas.ItemCreate], db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    # Xóa sạch bảng và ghi đè lại (Đơn giản nhất cho kéo thả)
-    db.query(models.Item).delete()
-    for item in items:
-        db.add(models.Item(**item.model_dump()))
-    db.commit()
-    return {"message": "Đã lưu toàn bộ cấu trúc"}
-
-# Đây là API bí mật
-@app.get("/users/me")
-def read_users_me(current_user_email: str = Depends(get_current_user)):
-    return {"message": "Chào mừng bạn!", "user_email": current_user_email}

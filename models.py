@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from database import Base
 
 class Item(Base):
@@ -11,6 +12,8 @@ class Item(Base):
     position = Column(Integer, default=0)
     color = Column(String, default="#ffffff")
     expanded = Column(Boolean, default=False)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="items")
 
 class User(Base):
     __tablename__ = "users"
@@ -19,4 +22,4 @@ class User(Base):
     username = Column(String)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-
+    items = relationship("Item", back_populates="owner")

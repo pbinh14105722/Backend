@@ -25,6 +25,7 @@ class ItemResponse(ItemBase):
         from_attributes = True
 
 class UserCreate(BaseModel):
+    username: str
     email: EmailStr
     password: str
 
@@ -37,3 +38,4 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+

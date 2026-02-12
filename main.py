@@ -94,29 +94,6 @@ def get_user_from_token(db: Session, email: str):
         raise HTTPException(status_code=404, detail="User không tồn tại")
     return user
 
-# Sửa lại hàm này để lấy thẳng Object User từ Database
-def get_current_user(db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Không thể xác thực thông tin",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        # Giải mã token để lấy email (sub)
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    
-    # Truy vấn lấy user ngay tại đây
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-        
-    return user # Trả về object User (chứa id, email, username...)
-
 # 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)
 def update_item(
@@ -163,3 +140,4 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
+

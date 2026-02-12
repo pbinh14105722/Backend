@@ -62,20 +62,28 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(database.get_db))
     }
 
 # Hàm này dùng để kiểm tra Token xem có hợp lệ không
-def get_current_user(token: str = Depends(oauth2_scheme)):
+# Sửa lại hàm này để lấy thẳng Object User từ Database
+def get_current_user(db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Không thể xác thực thông tin",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        # Giải mã token để lấy email (sub)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-        return email
     except JWTError:
         raise credentials_exception
+    
+    # Truy vấn lấy user ngay tại đây
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user # Trả về object User (chứa id, email, username...)
 
 # --- CÁC HÀM CRUD ĐÃ ĐƯỢC PHÂN QUYỀN ---
 
@@ -86,33 +94,28 @@ def get_user_from_token(db: Session, email: str):
         raise HTTPException(status_code=404, detail="User không tồn tại")
     return user
 
-# 1. Lấy danh sách (CHỈ LẤY CỦA MÌNH)
-@app.get("/items", response_model=list[schemas.ItemResponse]) # Đổi /data thành /items cho chuẩn RESTful
-def get_my_items(
-    db: Session = Depends(database.get_db), 
-    current_user_email: str = Depends(get_current_user)
-):
-    # Tìm user hiện tại
-    user = get_user_from_token(db, current_user_email)
+# Sửa lại hàm này để lấy thẳng Object User từ Database
+def get_current_user(db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Không thể xác thực thông tin",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        # Giải mã token để lấy email (sub)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
     
-    # LỌC DỮ LIỆU: Chỉ lấy item có owner_id trùng với id của user
-    return db.query(models.Item).filter(models.Item.owner_id == user.id).order_by(models.Item.position.asc()).all()
-
-# 2. Thêm mới (TỰ ĐỘNG GÁN CHO MÌNH)
-@app.post("/items", response_model=schemas.ItemResponse)
-def create_item(
-    item: schemas.ItemCreate, 
-    db: Session = Depends(database.get_db), 
-    current_user_email: str = Depends(get_current_user)
-):
-    user = get_user_from_token(db, current_user_email)
-    
-    # Khi tạo, gán luôn owner_id = user.id
-    db_item = models.Item(**item.model_dump(), owner_id=user.id)
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
+    # Truy vấn lấy user ngay tại đây
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user # Trả về object User (chứa id, email, username...)
 
 # 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)

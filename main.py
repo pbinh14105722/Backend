@@ -32,7 +32,7 @@ def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=400, detail="Email đã được đăng ký!")
     
     # 2. Hash mật khẩu và lưu
-    new_user = models.User(email=user.email, hashed_password=utils.hash_password(user.password))
+    new_user = models.User(username=user.username,email=user.email, hashed_password=utils.hash_password(user.password))
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -124,3 +124,4 @@ def save_all_items(items: list[schemas.ItemCreate], db: Session = Depends(databa
 @app.get("/users/me")
 def read_users_me(current_user_email: str = Depends(get_current_user)):
     return {"message": "Chào mừng bạn!", "user_email": current_user_email}
+

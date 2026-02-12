@@ -24,7 +24,7 @@ app.add_middleware(
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
 
 # --- API ĐĂNG KÝ ---
-@app.post("/signup", response_model=schemas.UserResponse)
+@app.post("/signup", response_model=schemas.AuthResponse)
 def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     # 1. Kiểm tra email tồn tại chưa
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -36,21 +36,30 @@ def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+
+    access_token = utils.create_access_token(data={"sub": new_user.email})
+
+    return {
+        "message": "Đăng ký tài khoản thành công!",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 # --- API ĐĂNG NHẬP ---
-@app.post("/login", response_model=schemas.Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    # 1. Tìm user theo email (form_data.username ở đây chính là email)
-    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+@app.post("/login", response_model=schemas.AuthResponse)
+def login(login_data: schemas.UserLogin, db: Session = Depends(database.get_db)):
+    # Bây giờ bạn dùng login_data.email nghe sẽ thuận tai hơn nhiều!
+    user = db.query(models.User).filter(models.User.email == login_data.email).first()
     
-    # 2. Kiểm tra user và verify mật khẩu
-    if not user or not utils.verify_password(form_data.password, user.hashed_password):
+    if not user or not utils.verify_password(login_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Sai tài khoản hoặc mật khẩu")
     
-    # 3. Tạo JWT Token
     access_token = utils.create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "message": "Đăng nhập thành công!",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 # Hàm này dùng để kiểm tra Token xem có hợp lệ không
 def get_current_user(token: str = Depends(oauth2_scheme)):

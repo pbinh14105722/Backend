@@ -11,6 +11,7 @@ class ItemBase(BaseModel):
     expanded: bool = False
 
 class ItemCreate(ItemBase):
+    id: Optional[str] = None
     name: str
     type: str
     parent_id: Optional[str] = None

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
-models.Base.metadata.create_all(bind=database.engine)
+#models.Base.metadata.create_all(bind=database.engine)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -180,3 +180,4 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
+

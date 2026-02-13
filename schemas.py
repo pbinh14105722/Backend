@@ -11,7 +11,11 @@ class ItemBase(BaseModel):
     expanded: bool = False
 
 class ItemCreate(ItemBase):
-    pass
+    name: str
+    type: str
+    parent_id: Optional[str] = None
+    position: int = 0
+    color: str = "#ffffff"
 
 class ItemBatchUpdate(BaseModel):
     id: str

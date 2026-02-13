@@ -13,6 +13,11 @@ class ItemBase(BaseModel):
 class ItemCreate(ItemBase):
     pass
 
+class ItemBatchUpdate(BaseModel):
+    id: str
+    parent_id: Optional[str] = None
+    position: int
+
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None

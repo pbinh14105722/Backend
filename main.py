@@ -94,6 +94,28 @@ def get_user_from_token(db: Session, email: str):
         raise HTTPException(status_code=404, detail="User không tồn tại")
     return user
 
+# 1. Lấy danh sách (CHỈ LẤY CỦA MÌNH)
+@app.get("/items", response_model=list[schemas.ItemResponse])
+def get_my_items(
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    return db.query(models.Item).filter(models.Item.owner_id == current_user.id).order_by(models.Item.position.asc()).all()
+
+# 2. Thêm mới (TỰ ĐỘNG GÁN CHO MÌNH)
+@app.post("/items", response_model=schemas.ItemResponse)
+def create_item(
+    item: schemas.ItemCreate, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    # Tạo item mới và gán owner_id là id của user đang đăng nhập
+    db_item = models.Item(**item.model_dump(), owner_id=current_user.id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
 # 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)
 def update_item(

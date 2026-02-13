@@ -13,10 +13,8 @@ class ItemBase(BaseModel):
 class ItemCreate(ItemBase):
     pass
 
-class ItemBatchUpdate(BaseModel):
-    id: str
-    parent_id: Optional[str] = None
-    position: int
+class ItemBatchUpdate(ItemBase):
+    pass
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None

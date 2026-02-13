@@ -138,29 +138,33 @@ def update_item(
 def save_all_structure(
     items: list[schemas.ItemBatchUpdate], 
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user) # Dùng thẳng object User đã login
+    current_user: models.User = Depends(get_current_user)
 ):
-    # 1. Lấy danh sách ID để kiểm tra một lượt (tăng performance)
     item_ids = [item.id for item in items]
     
-    # 2. Tìm tất cả items thuộc sở hữu của user này trong danh sách gửi lên
+    # Tìm các item hiện có trong DB thuộc về User này
     db_items = db.query(models.Item).filter(
         models.Item.id.in_(item_ids),
         models.Item.owner_id == current_user.id
     ).all()
 
-    # Tạo một dictionary để tìm kiếm nhanh hơn
     db_items_dict = {item.id: item for item in db_items}
 
-    # 3. Cập nhật dữ liệu
+    updated_count = 0
     for item_data in items:
         db_item = db_items_dict.get(item_data.id)
         if db_item:
-            db_item.parent_id = item_data.parent_id
-            db_item.position = item_data.position
+            # TỰ ĐỘNG CẬP NHẬT TẤT CẢ CÁC TRƯỜNG
+            # Duyệt qua các dữ liệu gửi lên và gán vào DB object
+            update_data = item_data.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(db_item, key, value)
+            
+            db.add(db_item)
+            updated_count += 1
 
     db.commit()
-    return {"message": f"Đã cập nhật cấu trúc cho {len(db_items)} mục thành công"}
+    return {"message": f"Đã cập nhật hoàn toàn cho {updated_count} mục thành công"}
 
 # 4. Xóa (CHỈ XÓA ĐƯỢC CỦA MÌNH)
 @app.delete("/items/{item_id}")

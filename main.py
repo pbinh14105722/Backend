@@ -100,14 +100,12 @@ def update_item(
     item_id: str, 
     item_data: schemas.ItemUpdate, 
     db: Session = Depends(database.get_db), 
-    current_user_email: str = Depends(get_current_user)
-):
-    user = get_user_from_token(db, current_user_email)
-    
+    current_user: models.User = Depends(get_current_user)
+):  
     # Tìm item, NHƯNG phải kèm điều kiện owner_id
     db_item = db.query(models.Item).filter(
         models.Item.id == item_id, 
-        models.Item.owner_id == user.id  # <-- Khóa bảo mật
+        models.Item.owner_id == current_user.id  # <-- Khóa bảo mật
     ).first()
     
     if not db_item:
@@ -167,4 +165,3 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
-

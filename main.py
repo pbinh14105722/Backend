@@ -95,15 +95,15 @@ def get_user_from_token(db: Session, email: str):
     return user
 
 # 1. Lấy toàn bộ danh sách (Sắp xếp theo position)
-@app.get("/data")#, response_model=list[schemas.ItemResponse])
-def get_all_items(db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
+@app.get("/items")#, response_model=list[schemas.ItemResponse])
+def get_all_items(db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
     #return db.query(models.Item).order_by(models.Item.position.asc()).all()
-    return db.query(models.Item).filter(models.Item.owner_email == current_user).order_by(models.Item.position.asc()).all()
+    return db.query(models.Item).filter(models.Item.owner_id == current_user.id).order_by(models.Item.position.asc()).all()
 
 # 2. Thêm mới một item
 @app.post("/items", response_model=schemas.ItemResponse)
 def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    db_item = models.Item(**item.model_dump())
+    db_item = models.Item(**item.model_dump(), owner_id=current_user.id)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
@@ -180,4 +180,3 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
-

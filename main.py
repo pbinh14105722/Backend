@@ -94,6 +94,29 @@ def get_user_from_token(db: Session, email: str):
         raise HTTPException(status_code=404, detail="User không tồn tại")
     return user
 
+# Sửa lại hàm này để lấy thẳng Object User từ Database
+def get_current_user(db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Không thể xác thực thông tin",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        # Giải mã token để lấy email (sub)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    # Truy vấn lấy user ngay tại đây
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+        
+    return user # Trả về object User (chứa id, email, username...)
+
 # 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)
 def update_item(
@@ -120,18 +143,45 @@ def update_item(
     db.refresh(db_item)
     return db_item
 
+# Cập nhật nhanh tối ưu hơn
+@app.post("/items/save-all")
+def save_all_structure(
+    items: list[schemas.ItemBatchUpdate], 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user) # Dùng thẳng object User đã login
+):
+    # 1. Lấy danh sách ID để kiểm tra một lượt (tăng performance)
+    item_ids = [item.id for item in items]
+    
+    # 2. Tìm tất cả items thuộc sở hữu của user này trong danh sách gửi lên
+    db_items = db.query(models.Item).filter(
+        models.Item.id.in_(item_ids),
+        models.Item.owner_id == current_user.id
+    ).all()
+
+    # Tạo một dictionary để tìm kiếm nhanh hơn
+    db_items_dict = {item.id: item for item in db_items}
+
+    # 3. Cập nhật dữ liệu
+    for item_data in items:
+        db_item = db_items_dict.get(item_data.id)
+        if db_item:
+            db_item.parent_id = item_data.parent_id
+            db_item.position = item_data.position
+
+    db.commit()
+    return {"message": f"Đã cập nhật cấu trúc cho {len(db_items)} mục thành công"}
+
 # 4. Xóa (CHỈ XÓA ĐƯỢC CỦA MÌNH)
 @app.delete("/items/{item_id}")
 def delete_item(
     item_id: str, 
     db: Session = Depends(database.get_db), 
-    current_user_email: str = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user) # Gọn hơn
 ):
-    user = get_user_from_token(db, current_user_email)
-    
     db_item = db.query(models.Item).filter(
         models.Item.id == item_id, 
-        models.Item.owner_id == user.id # <-- Khóa bảo mật
+        models.Item.owner_id == current_user.id
     ).first()
     
     if not db_item:
@@ -140,4 +190,3 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Đã xóa thành công"}
-

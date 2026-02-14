@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr,Field
 from typing import Optional, List
+import uuid
 
 class ItemBase(BaseModel):
-    id: str
     name: str
     type: str
     parent_id: Optional[str] = None
@@ -14,7 +14,13 @@ class ItemCreate(ItemBase):
     pass
 
 class ItemBatchUpdate(ItemBase):
-    pass
+    id: str
+    name: str
+    type: str
+    parent_id: Optional[str] = None
+    position: int
+    color: str = "#ffffff"
+    expanded: bool = False
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -24,6 +30,15 @@ class ItemUpdate(BaseModel):
     position: Optional[int] = None
 
 class ItemResponse(ItemBase):
+    id: str
+    name: str
+    type: str
+    parent_id: Optional[str] = None
+    position: int
+    color: str
+    expanded: bool
+    owner_id: int  # Frontend cần biết owner
+
     class Config:
         from_attributes = True
 

@@ -95,19 +95,26 @@ def get_user_from_token(db: Session, email: str):
     return user
 
 # 1. Lấy toàn bộ danh sách (Sắp xếp theo position)
-@app.get("/items")#, response_model=list[schemas.ItemResponse])
+@app.get("/items", response_model=list[schemas.ItemResponse])
 def get_all_items(db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
     #return db.query(models.Item).order_by(models.Item.position.asc()).all()
     return db.query(models.Item).filter(models.Item.owner_id == current_user.id).order_by(models.Item.position.asc()).all()
 
 # 2. Thêm mới một item
-@app.post("/items", response_model=schemas.ItemResponse)
-def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: str = Depends(get_current_user)):
-    db_item = models.Item(**item.model_dump(), owner_id=current_user.id)
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
+@app.post("/items", response_model=schemas.ItemResponse, status_code=status.HTTP_201_CREATED)
+def create_item(item: schemas.ItemCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    db_item = models.Item(
+        **item.model_dump(),
+        owner_id=current_user.id
+    )
+    try:
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
+        return db_item
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu vào database: {str(e)}")
 
 # 3. Cập nhật (CHỈ SỬA ĐƯỢC CỦA MÌNH)
 @app.put("/items/{item_id}", response_model=schemas.ItemResponse)
@@ -126,12 +133,18 @@ def update_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Không tìm thấy mục này (hoặc bạn không có quyền)")
     
-    for key, value in item_data.model_dump(exclude_unset=True).items():
+    # Chỉ update các field được gửi lên
+    update_data = item_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_item, key, value)
     
-    db.commit()
-    db.refresh(db_item)
-    return db_item
+    try:
+        db.commit()
+        db.refresh(db_item)
+        return db_item
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật: {str(e)}")
 
 # Cập nhật nhanh tối ưu hơn
 @app.post("/items/save-all")
@@ -140,6 +153,9 @@ def save_all_structure(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    if not items:
+        return {"message": "Không có dữ liệu để cập nhật"}
+    
     item_ids = [item.id for item in items]
     
     # Tìm các item hiện có trong DB thuộc về User này
@@ -154,20 +170,24 @@ def save_all_structure(
     for item_data in items:
         db_item = db_items_dict.get(item_data.id)
         if db_item:
-            # TỰ ĐỘNG CẬP NHẬT TẤT CẢ CÁC TRƯỜNG
-            # Duyệt qua các dữ liệu gửi lên và gán vào DB object
-            update_data = item_data.model_dump(exclude_unset=True)
+            # ✅ CHỈ UPDATE CÁC FIELD AN TOÀN (không cho phép đổi owner_id)
+            safe_fields = ['name', 'type', 'parent_id', 'position', 'color', 'expanded']
+            update_data = item_data.model_dump(include=safe_fields)
             for key, value in update_data.items():
                 setattr(db_item, key, value)
             
-            db.add(db_item)
+            #db.add(db_item)
             updated_count += 1
 
-    db.commit()
-    return {"message": f"Đã cập nhật hoàn toàn cho {updated_count} mục thành công"}
+    try:
+        db.commit()
+        return {"message": f"Đã cập nhật {updated_count}/{len(items)} mục thành công"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu: {str(e)}")
 
 # 4. Xóa (CHỈ XÓA ĐƯỢC CỦA MÌNH)
-@app.delete("/items/{item_id}")
+@app.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(
     item_id: str, 
     db: Session = Depends(database.get_db), 
@@ -181,6 +201,9 @@ def delete_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Không tìm thấy mục này")
     
-    db.delete(db_item)
-    db.commit()
-    return {"message": "Đã xóa thành công"}
+    try:
+        db.delete(db_item)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi khi xóa: {str(e)}")

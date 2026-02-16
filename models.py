@@ -50,7 +50,7 @@ class Item(Base): #FOLDER / PROJECT
     
     # Relationships
     owner = relationship("User", back_populates="items")
-    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    #tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
 class User(Base): # TÀI KHOẢN NGƯỜI DÙNG
     __tablename__ = "users"
@@ -68,44 +68,4 @@ class User(Base): # TÀI KHOẢN NGƯỜI DÙNG
         "Item", 
         back_populates="owner", 
         cascade="all, delete-orphan"  # ✅ Tự động xóa items khi xóa user
-    )
-
-class Task(Base):  # TASK TRONG PROJECT
-    __tablename__ = "tasks"
-    
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=generate_uuid,
-        index=True
-    )
-    
-    # Link tới project (Item có type='PROJECT')
-    project_id = Column(
-        String(36),
-        ForeignKey("items.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
-    )
-    
-    # Task info
-    name = Column(String(255), nullable=False)
-    position = Column(Integer, default=0, nullable=False)
-    priority = Column(String(10), default='medium', nullable=False)
-    
-    # Dates
-    start_date = Column(Date, nullable=True)
-    due_date = Column(Date, nullable=True)
-    
-    # Time tracking
-    time_spent_minutes = Column(Integer, default=0)
-    
-    # Relationships
-    project = relationship("Item", back_populates="tasks")
-    
-    # Constraints
-    __table_args__ = (
-        CheckConstraint("priority IN ('high', 'medium', 'low')", name="check_priority"),
-        CheckConstraint("time_spent_minutes >= 0", name="check_time_positive"),
-        CheckConstraint("due_date IS NULL OR start_date IS NULL OR due_date >= start_date", name="check_dates"),
     )

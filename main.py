@@ -204,6 +204,7 @@ def delete_item(
     try:
         db.delete(db_item)
         db.commit()
+        return {"message": "Đã xóa thành công", "id": item_id}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa: {str(e)}")

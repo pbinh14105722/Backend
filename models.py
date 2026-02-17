@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, CheckConstraint, Date
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, CheckConstraint, Text, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 import uuid
+from datetime import datetime
 
 def generate_uuid():
     """Generate a UUID v4 string"""
@@ -68,4 +69,29 @@ class User(Base): # TÀI KHOẢN NGƯỜI DÙNG
         "Item", 
         back_populates="owner", 
         cascade="all, delete-orphan"  # ✅ Tự động xóa items khi xóa user
+    )
+class Task(Base):  # TASK TRONG PROJECT
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)  # ← Auto-increment integer
+    project_id = Column(String(36), ForeignKey("items.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = Column(Integer, default=1, nullable=False)  # ← Bắt đầu từ 1
+    name = Column(String(255), nullable=False)
+    priority = Column(String(10), default='low', nullable=False)  # ← Mặc định 'low'
+    
+    # DateTime với timezone
+    start_date = Column(DateTime, nullable=False)
+    due_date = Column(DateTime, nullable=False)
+    
+    # Time spent (lưu tổng số giây)
+    time_spent_seconds = Column(Integer, default=0)
+    
+    # Notes
+    notes = Column(Text, default="", nullable=False)
+    
+    project = relationship("Item", back_populates="tasks")
+    
+    __table_args__ = (
+        CheckConstraint("priority IN ('high', 'medium', 'low')", name="check_priority"),
+        CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
     )

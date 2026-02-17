@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from utils import SECRET_KEY, ALGORITHM
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -204,7 +204,7 @@ def delete_item(
     try:
         db.delete(db_item)
         db.commit()
-        #return {"message": "Đã xóa thành công", "id": item_id}
+        return {"message": "Đã xóa thành công", "id": item_id}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa: {str(e)}")

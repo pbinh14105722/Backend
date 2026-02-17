@@ -51,7 +51,7 @@ class Item(Base): #FOLDER / PROJECT
     
     # Relationships
     owner = relationship("User", back_populates="items")
-    #tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
 class User(Base): # TÀI KHOẢN NGƯỜI DÙNG
     __tablename__ = "users"
@@ -95,3 +95,4 @@ class Task(Base):  # TASK TRONG PROJECT
         CheckConstraint("priority IN ('high', 'medium', 'low')", name="check_priority"),
         CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
     )
+

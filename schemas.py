@@ -1,7 +1,7 @@
-from pydantic import BaseModel, EmailStr,Field, field_validator
+from pydantic import BaseModel, EmailStr,Field, field_validator, DateTime
 from typing import Optional, List
 import uuid
-from datetime import date
+from datetime import datetime
 
 # ============ ITEM SCHEMAS (FOLDER/PROJECT) ============
 class ItemBase(BaseModel):
@@ -70,3 +70,44 @@ class AuthResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+# ============ TASK SCHEMAS (MỚI) ============
+
+class TaskCreate(BaseModel):
+    """Tạo task - Tất cả fields đều optional, backend tự điền mặc định"""
+    pass
+
+class TaskUpdate(BaseModel):
+    """PATCH - chỉ update các field được gửi"""
+    name: Optional[str] = None
+    priority: Optional[str] = None
+    start_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    time_spent: Optional[str] = None  # Format "HH:mm:ss"
+    notes: Optional[str] = None
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        if v and v not in ['high', 'medium', 'low']:
+            raise ValueError("Priority must be 'high', 'medium', or 'low'")
+        return v
+
+class TaskReorderItem(BaseModel):
+    """Reorder - chỉ cần id và position"""
+    id: int
+    position: int
+
+class TaskResponse(BaseModel):
+    """Response trả về frontend"""
+    id: int
+    position: int
+    name: str
+    priority: str
+    start_date: str  # ISO 8601: "2026-02-10T00:00:00.000Z"
+    due_date: str    # ISO 8601: "2026-02-11T23:59:59.999Z"
+    time_spent: str  # Format "HH:mm:ss"
+    notes: str
+    
+    class Config:
+        from_attributes = True

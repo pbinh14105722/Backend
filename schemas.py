@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr,Field, field_validator, DateTime
+from pydantic import BaseModel, EmailStr,Field, field_validator
 from typing import Optional, List
 import uuid
 from datetime import datetime
@@ -111,3 +111,4 @@ class TaskResponse(BaseModel):
     
     class Config:
         from_attributes = True
+

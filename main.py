@@ -232,7 +232,10 @@ def format_datetime_iso(dt: datetime) -> str:
     """Convert datetime sang ISO 8601 với timezone"""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat().replace('+00:00', '.000Z')
+    iso_str = dt.isoformat()
+    if iso_str.endswith('+00:00'):
+        return iso_str.replace('+00:00', 'Z')
+    return iso_str ##############=========== hàm mới thêm nha code chạy lỗi thì là ở ===============
 
 def verify_project_owner(project_id: str, user_id: int, db: Session):
     """Kiểm tra user có phải owner của project không"""

@@ -314,52 +314,7 @@ def create_task(
         print(f"[CREATE TASK] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi tạo task: {str(e)}")
 
-# 3. PATCH - Chỉnh sửa task
-@app.patch("/project/{projectId}/items/{id}", response_model=schemas.TaskResponse)
-def update_task(
-    projectId: str,
-    id: int,
-    task_data: schemas.TaskUpdate,
-    db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    print(f"[UPDATE TASK] User {current_user.id} updating task {id} in project {projectId}")
-    
-    # Verify ownership
-    verify_project_owner(projectId, current_user.id, db)
-    
-    # Tìm task
-    db_task = db.query(models.Task).filter(
-        models.Task.id == id,
-        models.Task.project_id == projectId
-    ).first()
-    
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    # Update chỉ các field được gửi
-    update_data = task_data.model_dump(exclude_unset=True)
-    
-    # Xử lý time_spent nếu có
-    if 'time_spent' in update_data:
-        update_data['time_spent_seconds'] = update_data.pop('time_spent')
-    
-    # Update các field còn lại
-    for key, value in update_data.items():
-        setattr(db_task, key, value)
-    
-    try:
-        db.commit()
-        db.refresh(db_task)
-        
-        print(f"[UPDATE TASK] ✅ Updated task {id}")
-        return format_task_response(db_task)
-    except Exception as e:
-        db.rollback()
-        print(f"[UPDATE TASK] ❌ Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật task: {str(e)}")
-
-# 4. DELETE - Xóa task và reorder
+# 3. DELETE - Xóa task và reorder
 @app.delete("/project/{projectId}/items/{id}")
 def delete_task(
     projectId: str,
@@ -407,7 +362,7 @@ def delete_task(
         print(f"[DELETE TASK] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa task: {str(e)}")
 
-# 5. PATCH - Cập nhật vị trí task (Reorder)
+# 4. PATCH - Cập nhật vị trí task (Reorder)
 @app.patch("/project/{projectId}/items/reorder", response_model=list[schemas.TaskResponse])
 def reorder_tasks(
     projectId: str,
@@ -453,4 +408,48 @@ def reorder_tasks(
         print(f"[REORDER TASKS] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi reorder: {str(e)}")
 
+# 5. PATCH - Chỉnh sửa task
+@app.patch("/project/{projectId}/items/{id}", response_model=schemas.TaskResponse)
+def update_task(
+    projectId: str,
+    id: int,
+    task_data: schemas.TaskUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    print(f"[UPDATE TASK] User {current_user.id} updating task {id} in project {projectId}")
+    
+    # Verify ownership
+    verify_project_owner(projectId, current_user.id, db)
+    
+    # Tìm task
+    db_task = db.query(models.Task).filter(
+        models.Task.id == id,
+        models.Task.project_id == projectId
+    ).first()
+    
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Update chỉ các field được gửi
+    update_data = task_data.model_dump(exclude_unset=True)
+    
+    # Xử lý time_spent nếu có
+    if 'time_spent' in update_data:
+        update_data['time_spent_seconds'] = update_data.pop('time_spent')
+    
+    # Update các field còn lại
+    for key, value in update_data.items():
+        setattr(db_task, key, value)
+    
+    try:
+        db.commit()
+        db.refresh(db_task)
+        
+        print(f"[UPDATE TASK] ✅ Updated task {id}")
+        return format_task_response(db_task)
+    except Exception as e:
+        db.rollback()
+        print(f"[UPDATE TASK] ❌ Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật task: {str(e)}")
 ##########################################################################################################

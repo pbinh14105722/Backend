@@ -83,7 +83,7 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
-    time_spent: Optional[str] = None  # Format "HH:mm:ss"
+    time_spent: Optional[int] = Field(default=None, ge=0)
     notes: Optional[str] = None
     
     @field_validator('priority')
@@ -106,9 +106,8 @@ class TaskResponse(BaseModel):
     priority: str
     start_date: str  # ISO 8601: "2026-02-10T00:00:00.000Z"
     due_date: str    # ISO 8601: "2026-02-11T23:59:59.999Z"
-    time_spent: str  # Format "HH:mm:ss"
+    time_spent: int  
     notes: str
     
     class Config:
         from_attributes = True
-

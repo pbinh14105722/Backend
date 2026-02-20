@@ -210,23 +210,6 @@ def delete_item(
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa: {str(e)}")
 ##########################################################################################################
 ########################################## CHỈNH SỬA TASK ###############################################
-def format_time_spent(seconds: int) -> str:
-    """Convert giây sang format 'HH:mm:ss'"""
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-
-def parse_time_spent(time_str: str) -> int:
-    """Convert 'HH:mm:ss' sang giây"""
-    try:
-        parts = time_str.split(':')
-        if len(parts) == 3:
-            hours, minutes, seconds = map(int, parts)
-            return hours * 3600 + minutes * 60 + seconds
-        return 0
-    except:
-        return 0
 
 def format_datetime_iso(dt: datetime) -> str:
     """Convert datetime sang ISO 8601 với timezone"""
@@ -259,7 +242,7 @@ def format_task_response(task: models.Task) -> dict:
         "priority": task.priority,
         "start_date": format_datetime_iso(task.start_date),
         "due_date": format_datetime_iso(task.due_date),
-        "time_spent": format_time_spent(task.time_spent_seconds),
+        "time_spent": task.time_spent_seconds,
         "notes": task.notes
     }
 
@@ -359,8 +342,7 @@ def update_task(
     
     # Xử lý time_spent nếu có
     if 'time_spent' in update_data:
-        time_spent_str = update_data.pop('time_spent')
-        db_task.time_spent_seconds = parse_time_spent(time_spent_str)
+        update_data['time_spent_seconds'] = update_data.pop('time_spent')
     
     # Update các field còn lại
     for key, value in update_data.items():

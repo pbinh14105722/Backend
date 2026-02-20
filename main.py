@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 import models, schemas, utils, database
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 app = FastAPI()
@@ -313,8 +313,8 @@ def create_task(
         position=task_count + 1,  # Vị trí cuối cùng
         name=f"Task {task_count + 1}",
         priority='low',  # Mặc định low
-        start_date=start_of_day,
-        due_date=end_of_day,
+        start_date=now,                              # ✅ Thời gian hiện tại chính xác
+        due_date=now + timedelta(hours=1),
         time_spent_seconds=0,
         notes=""
     )

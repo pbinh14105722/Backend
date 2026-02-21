@@ -453,3 +453,10 @@ def update_task(
         print(f"[UPDATE TASK] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật task: {str(e)}")
 ##########################################################################################################
+
+
+
+
+@app.get('/health')
+def health():
+    return {"status": "ok"}

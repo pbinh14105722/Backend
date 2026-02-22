@@ -12,6 +12,9 @@ app = FastAPI()
 # Tạo bảng trong DB (chỉ dùng cho demo, thực tế nên dùng Alembic)
 #models.Base.metadata.create_all(bind=database.engine)
 
+import username_password_update
+app.include_router(username_password_update.router)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 app.add_middleware(

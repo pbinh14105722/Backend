@@ -96,3 +96,26 @@ class Task(Base):  # TASK TRONG PROJECT
         CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
     )
 
+#==============================POMODORO===========================================
+class PomodoroSettings(Base):
+    __tablename__ = "pomodoro_settings"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    user_id          = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    focus_duration   = Column(Integer, nullable=False, default=1500)
+    short_break      = Column(Integer, nullable=False, default=300)
+    long_break       = Column(Integer, nullable=False, default=900)
+    long_break_after = Column(Integer, nullable=False, default=4)
+    disable_break    = Column(Boolean, nullable=False, default=False)
+    auto_start_focus = Column(Boolean, nullable=False, default=False)
+    auto_start_break = Column(Boolean, nullable=False, default=False)
+
+class PomodoroSession(Base):
+    __tablename__ = "pomodoro_sessions"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    mode         = Column(String(20), nullable=False)
+    duration     = Column(Integer, nullable=False)
+    task_id      = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=False)

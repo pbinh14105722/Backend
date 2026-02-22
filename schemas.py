@@ -70,6 +70,11 @@ class AuthResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+# cập nhật username và password
+class UpdatePassword(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+    confirm_password: str
 
 # ============ TASK SCHEMAS (MỚI) ============
 

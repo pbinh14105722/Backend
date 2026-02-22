@@ -15,6 +15,9 @@ app = FastAPI()
 import username_password_update
 app.include_router(username_password_update.router)
 
+import pomodoro                        
+app.include_router(pomodoro.router)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 app.add_middleware(

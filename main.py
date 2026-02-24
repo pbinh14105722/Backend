@@ -15,7 +15,7 @@ app = FastAPI()
 import username_password_update
 app.include_router(username_password_update.router)
 
-import pomodoro                        
+import pomodoro                        # ✅ Thêm vào đây
 app.include_router(pomodoro.router)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -345,6 +345,15 @@ def delete_task(
     deleted_position = db_task.position
     
     try:
+        # ✅ Thêm vào đây — log task history trước khi xóa
+        history = models.TaskHistory(
+            user_id=current_user.id,
+            project_id=projectId,
+            task_name=db_task.name,
+            completed_at=datetime.now(timezone.utc)
+        )
+        db.add(history)
+        
         # Xóa task
         db.delete(db_task)
         

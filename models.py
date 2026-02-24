@@ -95,7 +95,7 @@ class Task(Base):  # TASK TRONG PROJECT
         CheckConstraint("priority IN ('high', 'medium', 'low')", name="check_priority"),
         CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
     )
-
+ 
 class TaskHistory(Base):
     __tablename__ = "task_history"
     id           = Column(Integer, primary_key=True, autoincrement=True)
@@ -127,3 +127,4 @@ class PomodoroSession(Base):
     duration     = Column(Integer, nullable=False)
     task_id      = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=False)
+

@@ -380,6 +380,16 @@ def delete_task(
         print(f"[DELETE TASK] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa task: {str(e)}")
 
+# ✅ Thêm vào đây — ngay sau delete_task
+@app.delete("/project/{projectId}/items/{id}/done")
+def done_task(
+    projectId: str,
+    id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return delete_task(projectId, id, db, current_user)
+
 # 4. PATCH - Cập nhật vị trí task (Reorder)
 @app.patch("/project/{projectId}/items/reorder", response_model=list[schemas.TaskResponse])
 def reorder_tasks(

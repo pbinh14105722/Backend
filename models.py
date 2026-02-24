@@ -96,6 +96,14 @@ class Task(Base):  # TASK TRONG PROJECT
         CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
     )
 
+class TaskHistory(Base):
+    __tablename__ = "task_history"
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    project_id   = Column(String, nullable=False)
+    task_name    = Column(String(255), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=False)
+
 #==============================POMODORO===========================================
 class PomodoroSettings(Base):
     __tablename__ = "pomodoro_settings"

@@ -18,6 +18,9 @@ app.include_router(username_password_update.router)
 import pomodoro                        # ✅ Thêm vào đây
 app.include_router(pomodoro.router)
 
+import statistics
+app.include_router(statistics.router)
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 app.add_middleware(

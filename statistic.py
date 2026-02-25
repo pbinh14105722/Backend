@@ -243,27 +243,47 @@ def get_donut_chart(
                     if pid:
                         focus_by_project[pid] += s.duration / 3600
 
+            # def to_items(data, is_focus=False):
+            #     items = []
+            #     for pid, val in data.items():
+            #         if val <= 0:
+            #             continue
+            #         project = project_map.get(pid)
+            #         items.append({
+            #             "name": project.name if project else "Unknown",
+            #             "value": round(val, 1) if is_focus else int(val),
+            #             "color": (project.color if project and project.color else "#6366f1"),
+            #         })
+            #     items.sort(key=lambda x: x["value"], reverse=True)
+            #     if len(items) > 5:
+            #         top = items[:5]
+            #         other_val = sum(x["value"] for x in items[5:])
+            #         top.append({
+            #             "name": "Other",
+            #             "value": round(other_val, 1) if is_focus else int(other_val),
+            #             "color": "#ffffff"
+            #         })
+            #         return top
+            #     return items
             def to_items(data, is_focus=False):
                 items = []
                 for pid, val in data.items():
                     if val <= 0:
                         continue
-                    project = project_map.get(pid)
-                    items.append({
-                        "name": project.name if project else "Unknown",
-                        "value": round(val, 1) if is_focus else int(val),
-                        "color": (project.color if project and project.color else "#6366f1"),
-                    })
+        
+                project = project_map.get(pid)
+                items.append({
+                    "name": project.name if project else "Unknown",
+                    "value": round(val, 1) if is_focus else int(val),
+                    # Đổi màu mặc định sang màu tối (#3f3f46) để không bị lóa trên Dark Mode
+                    "color": (project.color if project and project.color else "#3f3f46"),
+                })
+
+                # Sắp xếp từ cao xuống thấp để Frontend lấy Top Project dễ dàng hơn
                 items.sort(key=lambda x: x["value"], reverse=True)
-                if len(items) > 5:
-                    top = items[:5]
-                    other_val = sum(x["value"] for x in items[5:])
-                    top.append({
-                        "name": "Other",
-                        "value": round(other_val, 1) if is_focus else int(other_val),
-                        "color": "#ffffff"
-                    })
-                    return top
+    
+                # KHÔNG thực hiện đoạn check if len(items) > 5 ở đây nữa.
+                # Trả về toàn bộ danh sách để Frontend tự xử lý hàm donutBuildSegments() của nó.
                 return items
 
             return {
@@ -341,44 +361,105 @@ def get_heatmap(
 
 # ========== LINE CHART (placeholder) ==========
 
+# @router.get("/line_chart")
+# def get_line_chart(
+#     db: Session = Depends(database.get_db),
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     # Trả về data giống summary nhưng chỉ focus array
+#     # Cần tài liệu API cụ thể để implement đúng
+#     try:
+#         today = datetime.now(timezone.utc).date()
+#         user_id = current_user.id
+
+#         all_sessions = db.query(models.PomodoroSession).filter(
+#             models.PomodoroSession.user_id == user_id,
+#             models.PomodoroSession.mode == 'focus'
+#         ).all()
+
+#         def build_focus_line(period_start, period_end, group_by):
+#             focus_by_day = defaultdict(float)
+#             for s in all_sessions:
+#                 d = to_date(s.completed_at)
+#                 if period_start <= d <= period_end:
+#                     focus_by_day[d] += s.duration / 3600
+
+#             if group_by == 'year':
+#                 return [round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 1) for m in range(1, 13)]
+#             else:
+#                 return [round(focus_by_day.get(d, 0.0), 1) for d in days_in_range(period_start, period_end)]
+
+#         w_start, w_end = get_week_range(today)
+#         m_start, m_end = get_month_range(today)
+#         y_start, y_end = get_year_range(today)
+
+#         return {
+#             "week": build_focus_line(w_start, w_end, 'week'),
+#             "month": build_focus_line(m_start, m_end, 'month'),
+#             "year": build_focus_line(y_start, y_end, 'year'),
+#         }
+
+#     except Exception as e:
+#         print(f"[LINE CHART] ❌ {str(e)}")
+#         raise HTTPException(status_code=500, detail="Failed to generate line chart data")
 @router.get("/line_chart")
 def get_line_chart(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Trả về data giống summary nhưng chỉ focus array
-    # Cần tài liệu API cụ thể để implement đúng
     try:
         today = datetime.now(timezone.utc).date()
         user_id = current_user.id
 
+        # Lấy dữ liệu thô từ DB (Tối ưu: Chỉ lấy trong khoảng cần thiết)
+        y_start, _ = get_year_range(today)
         all_sessions = db.query(models.PomodoroSession).filter(
             models.PomodoroSession.user_id == user_id,
-            models.PomodoroSession.mode == 'focus'
+            models.PomodoroSession.mode == 'focus',
+            models.PomodoroSession.completed_at >= y_start
+        ).all()
+        
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id,
+            models.TaskHistory.completed_at >= y_start
         ).all()
 
-        def build_focus_line(period_start, period_end, group_by):
+        def build_full_dataset(period_start, period_end, mode='week'):
+            days = days_in_range(period_start, period_end)
             focus_by_day = defaultdict(float)
-            for s in all_sessions:
-                d = to_date(s.completed_at)
-                if period_start <= d <= period_end:
-                    focus_by_day[d] += s.duration / 3600
+            tasks_by_day = defaultdict(int)
 
-            if group_by == 'year':
-                return [round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 1) for m in range(1, 13)]
-            else:
-                return [round(focus_by_day.get(d, 0.0), 1) for d in days_in_range(period_start, period_end)]
+            for s in all_sessions:
+                focus_by_day[to_date(s.completed_at)] += s.duration / 3600
+            for h in all_history:
+                tasks_by_day[to_date(h.completed_at)] += 1
+
+            if mode == 'year':
+                labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                tasks_arr, focus_arr = [], []
+                for m in range(1, 13):
+                    tasks_arr.append(sum(v for k, v in tasks_by_day.items() if k.month == m))
+                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m), 1))
+            elif mode == 'month':
+                labels = [f"D.{d.day}" for d in days]
+                tasks_arr = [tasks_by_day.get(d, 0) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in days]
+            else: # week
+                labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                tasks_arr = [tasks_by_day.get(d, 0) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in days]
+
+            return {"labels": labels, "tasks": tasks_arr, "focus": focus_arr}
 
         w_start, w_end = get_week_range(today)
         m_start, m_end = get_month_range(today)
         y_start, y_end = get_year_range(today)
 
         return {
-            "week": build_focus_line(w_start, w_end, 'week'),
-            "month": build_focus_line(m_start, m_end, 'month'),
-            "year": build_focus_line(y_start, y_end, 'year'),
+            "week": build_full_dataset(w_start, w_end, 'week'),
+            "month": build_full_dataset(m_start, m_end, 'month'),
+            "year": build_full_dataset(y_start, y_end, 'year'),
         }
-
     except Exception as e:
         print(f"[LINE CHART] ❌ {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate line chart data")
+        raise HTTPException(status_code=500, detail="Internal Server Error")

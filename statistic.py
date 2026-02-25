@@ -92,6 +92,199 @@ def get_user_projects(user_id: int, db: Session):
 
 # ========== SUMMARY ==========
 
+# @router.get("/summary")
+# def get_summary(
+#     db: Session = Depends(database.get_db),
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     try:
+#         today = datetime.now(timezone.utc).date()
+#         user_id = current_user.id
+
+#         all_history = db.query(models.TaskHistory).filter(
+#             models.TaskHistory.user_id == user_id
+#         ).all()
+
+#         all_sessions = db.query(models.PomodoroSession).filter(
+#             models.PomodoroSession.user_id == user_id,
+#             models.PomodoroSession.mode == 'focus'
+#         ).all()
+
+#         projects = get_user_projects(user_id, db)
+#         project_ids = [p.id for p in projects]
+#         all_tasks = db.query(models.Task).filter(
+#             models.Task.project_id.in_(project_ids)
+#         ).all() if project_ids else []
+
+#         def build_dataset(period_start, period_end, prev_start, prev_end, group_by):
+#             period_days = days_in_range(period_start, period_end)
+
+#             tasks_by_day = defaultdict(int)
+#             focus_by_day = defaultdict(float)
+#             pomo_by_day = defaultdict(int)
+
+#             for h in all_history:
+#                 d = to_date(h.completed_at)
+#                 if period_start <= d <= period_end:
+#                     tasks_by_day[d] += 1
+
+#             for s in all_sessions:
+#                 d = to_date(s.completed_at)
+#                 if period_start <= d <= period_end:
+#                     focus_by_day[d] += s.duration / 3600
+#                     pomo_by_day[d] += 1
+
+#             if group_by == 'year':
+#                 tasks_arr, focus_arr, pomo_arr = [], [], []
+#                 for month in range(1, 13):
+#                     t = sum(v for k, v in tasks_by_day.items() if k.month == month and k.year == period_start.year)
+#                     f = sum(v for k, v in focus_by_day.items() if k.month == month and k.year == period_start.year)
+#                     p = sum(v for k, v in pomo_by_day.items() if k.month == month and k.year == period_start.year)
+#                     tasks_arr.append(t)
+#                     focus_arr.append(round(f, 1))
+#                     pomo_arr.append(p)
+#             else:
+#                 tasks_arr = [tasks_by_day.get(d, 0) for d in period_days]
+#                 focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in period_days]
+#                 pomo_arr = [pomo_by_day.get(d, 0) for d in period_days]
+
+#             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
+#             created = done + len(all_tasks)
+
+#             active_days = set(k for k, v in tasks_by_day.items() if v > 0)
+#             streak, best_streak = compute_streak(active_days, period_start, period_end)
+
+#             prev_tasks = sum(1 for h in all_history if prev_start <= to_date(h.completed_at) <= prev_end)
+#             prev_focus = sum(s.duration / 3600 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
+#             prev_pomo = sum(1 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
+
+#             return {
+#                 "tasks": tasks_arr,
+#                 "focus": focus_arr,
+#                 "pomo": pomo_arr,
+#                 "created": created,
+#                 "done": done,
+#                 "streak": streak,
+#                 "bestStreak": best_streak,
+#                 "prevTasks": prev_tasks,
+#                 "prevFocus": round(prev_focus, 1),
+#                 "prevPomo": prev_pomo,
+#             }
+
+#         w_start, w_end = get_week_range(today)
+#         pw_start = w_start - timedelta(weeks=1)
+#         pw_end = w_end - timedelta(weeks=1)
+
+#         m_start, m_end = get_month_range(today)
+#         pm_start, pm_end = get_month_range(m_start - timedelta(days=1))
+
+#         y_start, y_end = get_year_range(today)
+#         py_start, py_end = get_year_range(date(today.year - 1, 1, 1))
+
+#         return {
+#             "week": build_dataset(w_start, w_end, pw_start, pw_end, 'week'),
+#             "month": build_dataset(m_start, m_end, pm_start, pm_end, 'month'),
+#             "year": build_dataset(y_start, y_end, py_start, py_end, 'year'),
+#         }
+
+#     except Exception as e:
+#         print(f"[SUMMARY] ❌ {str(e)}")
+#         raise HTTPException(status_code=500, detail="Failed to generate summary data")
+
+
+# # ========== DONUT CHART ==========
+
+# @router.get("/donut_chart")
+# def get_donut_chart(
+#     db: Session = Depends(database.get_db),
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     try:
+#         today = datetime.now(timezone.utc).date()
+#         user_id = current_user.id
+
+#         projects = get_user_projects(user_id, db)
+#         project_map = {p.id: p for p in projects}
+#         project_ids = list(project_map.keys())
+
+#         all_history = db.query(models.TaskHistory).filter(
+#             models.TaskHistory.user_id == user_id,
+#             models.TaskHistory.project_id.in_(project_ids)
+#         ).all() if project_ids else []
+
+#         all_sessions = db.query(models.PomodoroSession).filter(
+#             models.PomodoroSession.user_id == user_id,
+#             models.PomodoroSession.mode == 'focus'
+#         ).all()
+
+#         # Cache task->project mapping
+#         task_project_cache = {}
+#         def get_task_project(task_id):
+#             if task_id not in task_project_cache:
+#                 task = db.query(models.Task).filter(models.Task.id == task_id).first()
+#                 task_project_cache[task_id] = task.project_id if task else None
+#             return task_project_cache[task_id]
+
+#         def build_donut(period_start, period_end):
+#             tasks_by_project = defaultdict(int)
+#             focus_by_project = defaultdict(float)
+
+#             for h in all_history:
+#                 d = to_date(h.completed_at)
+#                 if period_start <= d <= period_end:
+#                     tasks_by_project[h.project_id] += 1
+
+#             for s in all_sessions:
+#                 if not s.task_id:
+#                     continue
+#                 d = to_date(s.completed_at)
+#                 if period_start <= d <= period_end:
+#                     pid = get_task_project(s.task_id)
+#                     if pid:
+#                         focus_by_project[pid] += s.duration / 3600
+
+#             def to_items(data, is_focus=False):
+#                 items = []
+#                 for pid, val in data.items():
+#                     if val <= 0:
+#                         continue
+#                     project = project_map.get(pid)
+#                     items.append({
+#                         "name": project.name if project else "Unknown",
+#                         "value": round(val, 1) if is_focus else int(val),
+#                         "color": (project.color if project and project.color else "#6366f1"),
+#                     })
+#                 items.sort(key=lambda x: x["value"], reverse=True)
+#                 if len(items) > 5:
+#                     top = items[:5]
+#                     other_val = sum(x["value"] for x in items[5:])
+#                     top.append({
+#                         "name": "Other",
+#                         "value": round(other_val, 1) if is_focus else int(other_val),
+#                         "color": "#ffffff"
+#                     })
+#                     return top
+#                 return items
+
+#             return {
+#                 "tasks": to_items(tasks_by_project, False),
+#                 "focus": to_items(focus_by_project, True),
+#             }
+
+#         w_start, w_end = get_week_range(today)
+#         m_start, m_end = get_month_range(today)
+#         y_start, y_end = get_year_range(today)
+
+#         return {
+#             "week": build_donut(w_start, w_end),
+#             "month": build_donut(m_start, m_end),
+#             "year": build_donut(y_start, y_end),
+#         }
+
+#     except Exception as e:
+#         print(f"[DONUT] ❌ {str(e)}")
+#         raise HTTPException(status_code=500, detail="Failed to generate donut chart data")
+
 @router.get("/summary")
 def get_summary(
     db: Session = Depends(database.get_db),
@@ -141,11 +334,11 @@ def get_summary(
                     f = sum(v for k, v in focus_by_day.items() if k.month == month and k.year == period_start.year)
                     p = sum(v for k, v in pomo_by_day.items() if k.month == month and k.year == period_start.year)
                     tasks_arr.append(t)
-                    focus_arr.append(round(f, 1))
+                    focus_arr.append(round(f, 2))  # ← sửa 1→2
                     pomo_arr.append(p)
             else:
                 tasks_arr = [tasks_by_day.get(d, 0) for d in period_days]
-                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in period_days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in period_days]  # ← sửa 1→2
                 pomo_arr = [pomo_by_day.get(d, 0) for d in period_days]
 
             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
@@ -167,7 +360,7 @@ def get_summary(
                 "streak": streak,
                 "bestStreak": best_streak,
                 "prevTasks": prev_tasks,
-                "prevFocus": round(prev_focus, 1),
+                "prevFocus": round(prev_focus, 2),  # ← sửa 1→2
                 "prevPomo": prev_pomo,
             }
 
@@ -190,101 +383,6 @@ def get_summary(
     except Exception as e:
         print(f"[SUMMARY] ❌ {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate summary data")
-
-
-# ========== DONUT CHART ==========
-
-@router.get("/donut_chart")
-def get_donut_chart(
-    db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    try:
-        today = datetime.now(timezone.utc).date()
-        user_id = current_user.id
-
-        projects = get_user_projects(user_id, db)
-        project_map = {p.id: p for p in projects}
-        project_ids = list(project_map.keys())
-
-        all_history = db.query(models.TaskHistory).filter(
-            models.TaskHistory.user_id == user_id,
-            models.TaskHistory.project_id.in_(project_ids)
-        ).all() if project_ids else []
-
-        all_sessions = db.query(models.PomodoroSession).filter(
-            models.PomodoroSession.user_id == user_id,
-            models.PomodoroSession.mode == 'focus'
-        ).all()
-
-        # Cache task->project mapping
-        task_project_cache = {}
-        def get_task_project(task_id):
-            if task_id not in task_project_cache:
-                task = db.query(models.Task).filter(models.Task.id == task_id).first()
-                task_project_cache[task_id] = task.project_id if task else None
-            return task_project_cache[task_id]
-
-        def build_donut(period_start, period_end):
-            tasks_by_project = defaultdict(int)
-            focus_by_project = defaultdict(float)
-
-            for h in all_history:
-                d = to_date(h.completed_at)
-                if period_start <= d <= period_end:
-                    tasks_by_project[h.project_id] += 1
-
-            for s in all_sessions:
-                if not s.task_id:
-                    continue
-                d = to_date(s.completed_at)
-                if period_start <= d <= period_end:
-                    pid = get_task_project(s.task_id)
-                    if pid:
-                        focus_by_project[pid] += s.duration / 3600
-
-            def to_items(data, is_focus=False):
-                items = []
-                for pid, val in data.items():
-                    if val <= 0:
-                        continue
-                    project = project_map.get(pid)
-                    items.append({
-                        "name": project.name if project else "Unknown",
-                        "value": round(val, 1) if is_focus else int(val),
-                        "color": (project.color if project and project.color else "#6366f1"),
-                    })
-                items.sort(key=lambda x: x["value"], reverse=True)
-                if len(items) > 5:
-                    top = items[:5]
-                    other_val = sum(x["value"] for x in items[5:])
-                    top.append({
-                        "name": "Other",
-                        "value": round(other_val, 1) if is_focus else int(other_val),
-                        "color": "#ffffff"
-                    })
-                    return top
-                return items
-
-            return {
-                "tasks": to_items(tasks_by_project, False),
-                "focus": to_items(focus_by_project, True),
-            }
-
-        w_start, w_end = get_week_range(today)
-        m_start, m_end = get_month_range(today)
-        y_start, y_end = get_year_range(today)
-
-        return {
-            "week": build_donut(w_start, w_end),
-            "month": build_donut(m_start, m_end),
-            "year": build_donut(y_start, y_end),
-        }
-
-    except Exception as e:
-        print(f"[DONUT] ❌ {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate donut chart data")
-
 
 # ========== HEATMAP ==========
 

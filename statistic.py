@@ -191,100 +191,6 @@ def get_user_projects(user_id: int, db: Session):
 #         print(f"[SUMMARY] ❌ {str(e)}")
 #         raise HTTPException(status_code=500, detail="Failed to generate summary data")
 
-
-# # ========== DONUT CHART ==========
-
-# @router.get("/donut_chart")
-# def get_donut_chart(
-#     db: Session = Depends(database.get_db),
-#     current_user: models.User = Depends(get_current_user)
-# ):
-#     try:
-#         today = datetime.now(timezone.utc).date()
-#         user_id = current_user.id
-
-#         projects = get_user_projects(user_id, db)
-#         project_map = {p.id: p for p in projects}
-#         project_ids = list(project_map.keys())
-
-#         all_history = db.query(models.TaskHistory).filter(
-#             models.TaskHistory.user_id == user_id,
-#             models.TaskHistory.project_id.in_(project_ids)
-#         ).all() if project_ids else []
-
-#         all_sessions = db.query(models.PomodoroSession).filter(
-#             models.PomodoroSession.user_id == user_id,
-#             models.PomodoroSession.mode == 'focus'
-#         ).all()
-
-#         # Cache task->project mapping
-#         task_project_cache = {}
-#         def get_task_project(task_id):
-#             if task_id not in task_project_cache:
-#                 task = db.query(models.Task).filter(models.Task.id == task_id).first()
-#                 task_project_cache[task_id] = task.project_id if task else None
-#             return task_project_cache[task_id]
-
-#         def build_donut(period_start, period_end):
-#             tasks_by_project = defaultdict(int)
-#             focus_by_project = defaultdict(float)
-
-#             for h in all_history:
-#                 d = to_date(h.completed_at)
-#                 if period_start <= d <= period_end:
-#                     tasks_by_project[h.project_id] += 1
-
-#             for s in all_sessions:
-#                 if not s.task_id:
-#                     continue
-#                 d = to_date(s.completed_at)
-#                 if period_start <= d <= period_end:
-#                     pid = get_task_project(s.task_id)
-#                     if pid:
-#                         focus_by_project[pid] += s.duration / 3600
-
-#             def to_items(data, is_focus=False):
-#                 items = []
-#                 for pid, val in data.items():
-#                     if val <= 0:
-#                         continue
-#                     project = project_map.get(pid)
-#                     items.append({
-#                         "name": project.name if project else "Unknown",
-#                         "value": round(val, 1) if is_focus else int(val),
-#                         "color": (project.color if project and project.color else "#6366f1"),
-#                     })
-#                 items.sort(key=lambda x: x["value"], reverse=True)
-#                 if len(items) > 5:
-#                     top = items[:5]
-#                     other_val = sum(x["value"] for x in items[5:])
-#                     top.append({
-#                         "name": "Other",
-#                         "value": round(other_val, 1) if is_focus else int(other_val),
-#                         "color": "#ffffff"
-#                     })
-#                     return top
-#                 return items
-
-#             return {
-#                 "tasks": to_items(tasks_by_project, False),
-#                 "focus": to_items(focus_by_project, True),
-#             }
-
-#         w_start, w_end = get_week_range(today)
-#         m_start, m_end = get_month_range(today)
-#         y_start, y_end = get_year_range(today)
-
-#         return {
-#             "week": build_donut(w_start, w_end),
-#             "month": build_donut(m_start, m_end),
-#             "year": build_donut(y_start, y_end),
-#         }
-
-#     except Exception as e:
-#         print(f"[DONUT] ❌ {str(e)}")
-#         raise HTTPException(status_code=500, detail="Failed to generate donut chart data")
-
 @router.get("/summary")
 def get_summary(
     db: Session = Depends(database.get_db),
@@ -383,6 +289,100 @@ def get_summary(
     except Exception as e:
         print(f"[SUMMARY] ❌ {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate summary data")
+
+# ========== DONUT CHART ==========
+
+@router.get("/donut_chart")
+def get_donut_chart(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        user_id = current_user.id
+
+        projects = get_user_projects(user_id, db)
+        project_map = {p.id: p for p in projects}
+        project_ids = list(project_map.keys())
+
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id,
+            models.TaskHistory.project_id.in_(project_ids)
+        ).all() if project_ids else []
+
+        all_sessions = db.query(models.PomodoroSession).filter(
+            models.PomodoroSession.user_id == user_id,
+            models.PomodoroSession.mode == 'focus'
+        ).all()
+
+        # Cache task->project mapping
+        task_project_cache = {}
+        def get_task_project(task_id):
+            if task_id not in task_project_cache:
+                task = db.query(models.Task).filter(models.Task.id == task_id).first()
+                task_project_cache[task_id] = task.project_id if task else None
+            return task_project_cache[task_id]
+
+        def build_donut(period_start, period_end):
+            tasks_by_project = defaultdict(int)
+            focus_by_project = defaultdict(float)
+
+            for h in all_history:
+                d = to_date(h.completed_at)
+                if period_start <= d <= period_end:
+                    tasks_by_project[h.project_id] += 1
+
+            for s in all_sessions:
+                if not s.task_id:
+                    continue
+                d = to_date(s.completed_at)
+                if period_start <= d <= period_end:
+                    pid = get_task_project(s.task_id)
+                    if pid:
+                        focus_by_project[pid] += s.duration / 3600
+
+            def to_items(data, is_focus=False):
+                items = []
+                for pid, val in data.items():
+                    if val <= 0:
+                        continue
+                    project = project_map.get(pid)
+                    items.append({
+                        "name": project.name if project else "Unknown",
+                        "value": round(val, 1) if is_focus else int(val),
+                        "color": (project.color if project and project.color else "#6366f1"),
+                    })
+                items.sort(key=lambda x: x["value"], reverse=True)
+                if len(items) > 5:
+                    top = items[:5]
+                    other_val = sum(x["value"] for x in items[5:])
+                    top.append({
+                        "name": "Other",
+                        "value": round(other_val, 1) if is_focus else int(other_val),
+                        "color": "#ffffff"
+                    })
+                    return top
+                return items
+
+            return {
+                "tasks": to_items(tasks_by_project, False),
+                "focus": to_items(focus_by_project, True),
+            }
+
+        w_start, w_end = get_week_range(today)
+        m_start, m_end = get_month_range(today)
+        y_start, y_end = get_year_range(today)
+
+        return {
+            "week": build_donut(w_start, w_end),
+            "month": build_donut(m_start, m_end),
+            "year": build_donut(y_start, y_end),
+        }
+
+    except Exception as e:
+        print(f"[DONUT] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate donut chart data")
+
 
 # ========== HEATMAP ==========
 

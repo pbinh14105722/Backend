@@ -243,41 +243,19 @@ def get_donut_chart(
                     if pid:
                         focus_by_project[pid] += s.duration / 3600
 
-            # def to_items(data, is_focus=False):
-            #     items = []
-            #     for pid, val in data.items():
-            #         if val <= 0:
-            #             continue
-            #         project = project_map.get(pid)
-            #         items.append({
-            #             "name": project.name if project else "Unknown",
-            #             "value": round(val, 1) if is_focus else int(val),
-            #             "color": (project.color if project and project.color else "#6366f1"),
-            #         })
-            #     items.sort(key=lambda x: x["value"], reverse=True)
-            #     if len(items) > 5:
-            #         top = items[:5]
-            #         other_val = sum(x["value"] for x in items[5:])
-            #         top.append({
-            #             "name": "Other",
-            #             "value": round(other_val, 1) if is_focus else int(other_val),
-            #             "color": "#ffffff"
-            #         })
-            #         return top
-            #     return items
             def to_items(data, is_focus=False):
                 items = []
                 for pid, val in data.items():
                     if val <= 0:
                         continue
         
-                project = project_map.get(pid)
-                items.append({
-                    "name": project.name if project else "Unknown",
-                    "value": round(val, 1) if is_focus else int(val),
-                    # Đổi màu mặc định sang màu tối (#3f3f46) để không bị lóa trên Dark Mode
-                    "color": (project.color if project and project.color else "#3f3f46"),
-                })
+                    project = project_map.get(pid)
+                    items.append({
+                        "name": project.name if project else "Unknown",
+                        "value": round(val, 1) if is_focus else int(val),
+                        # Đổi màu mặc định sang màu tối (#3f3f46) để không bị lóa trên Dark Mode
+                        "color": (project.color if project and project.color else "#3f3f46"),
+                    })
 
                 # Sắp xếp từ cao xuống thấp để Frontend lấy Top Project dễ dàng hơn
                 items.sort(key=lambda x: x["value"], reverse=True)
@@ -361,47 +339,6 @@ def get_heatmap(
 
 # ========== LINE CHART (placeholder) ==========
 
-# @router.get("/line_chart")
-# def get_line_chart(
-#     db: Session = Depends(database.get_db),
-#     current_user: models.User = Depends(get_current_user)
-# ):
-#     # Trả về data giống summary nhưng chỉ focus array
-#     # Cần tài liệu API cụ thể để implement đúng
-#     try:
-#         today = datetime.now(timezone.utc).date()
-#         user_id = current_user.id
-
-#         all_sessions = db.query(models.PomodoroSession).filter(
-#             models.PomodoroSession.user_id == user_id,
-#             models.PomodoroSession.mode == 'focus'
-#         ).all()
-
-#         def build_focus_line(period_start, period_end, group_by):
-#             focus_by_day = defaultdict(float)
-#             for s in all_sessions:
-#                 d = to_date(s.completed_at)
-#                 if period_start <= d <= period_end:
-#                     focus_by_day[d] += s.duration / 3600
-
-#             if group_by == 'year':
-#                 return [round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 1) for m in range(1, 13)]
-#             else:
-#                 return [round(focus_by_day.get(d, 0.0), 1) for d in days_in_range(period_start, period_end)]
-
-#         w_start, w_end = get_week_range(today)
-#         m_start, m_end = get_month_range(today)
-#         y_start, y_end = get_year_range(today)
-
-#         return {
-#             "week": build_focus_line(w_start, w_end, 'week'),
-#             "month": build_focus_line(m_start, m_end, 'month'),
-#             "year": build_focus_line(y_start, y_end, 'year'),
-#         }
-
-#     except Exception as e:
-#         print(f"[LINE CHART] ❌ {str(e)}")
-#         raise HTTPException(status_code=500, detail="Failed to generate line chart data")
 @router.get("/line_chart")
 def get_line_chart(
     db: Session = Depends(database.get_db),

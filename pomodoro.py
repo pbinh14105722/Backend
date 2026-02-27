@@ -166,6 +166,14 @@ def create_session(
 
     try:
         db.add(session)
+
+        # Nếu là focus session và có task_id -> cộng thêm duration vào time_spent_seconds của task
+        if data.mode == "focus" and data.task_id is not None:
+            task = db.query(models.Task).filter(models.Task.id == data.task_id).first()
+            if task:
+                task.time_spent_seconds = (task.time_spent_seconds or 0) + data.duration
+                print(f"[POMODORO] ⏱ Updated task {task.id} time_spent_seconds += {data.duration} -> {task.time_spent_seconds}")
+
         db.commit()
         db.refresh(session)
         print(f"[POMODORO] ✅ Session saved ID {session.id}")

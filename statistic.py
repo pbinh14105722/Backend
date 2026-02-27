@@ -269,9 +269,13 @@ def get_donut_chart(
                 "focus": to_items(focus_by_project, True),
             }
 
-        w_start, w_end = get_week_range(today)
-        m_start, m_end = get_month_range(today)
-        y_start, y_end = get_year_range(today)
+        # Donut chart: lấy 7 ngày trước, 30 ngày trước, 365 ngày trước (tính từ hôm nay)
+        w_start = today - timedelta(days=6)   # 7 ngày gần nhất (hôm nay - 6 ngày)
+        w_end = today
+        m_start = today - timedelta(days=29)  # 30 ngày gần nhất (hôm nay - 29 ngày)
+        m_end = today
+        y_start = today - timedelta(days=364) # 365 ngày gần nhất (hôm nay - 364 ngày)
+        y_end = today
 
         return {
             "week": build_donut(w_start, w_end),

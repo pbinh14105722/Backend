@@ -145,11 +145,11 @@ def get_summary(
                     f = sum(v for k, v in focus_by_day.items() if k.month == month and k.year == period_start.year)
                     p = sum(v for k, v in pomo_by_day.items() if k.month == month and k.year == period_start.year)
                     tasks_arr.append(t)
-                    focus_arr.append(round(f, 1))
+                    focus_arr.append(round(f, 2))
                     pomo_arr.append(p)
             else:
                 tasks_arr = [tasks_by_day.get(d, 0) for d in period_days]
-                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in period_days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in period_days]
                 pomo_arr = [pomo_by_day.get(d, 0) for d in period_days]
 
             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
@@ -173,7 +173,7 @@ def get_summary(
                 "streak": streak,
                 "bestStreak": best_streak,
                 "prevTasks": prev_tasks,
-                "prevFocus": round(prev_focus, 1),
+                "prevFocus": round(prev_focus, 2),
                 "prevPomo": prev_pomo,
             }
 
@@ -352,7 +352,7 @@ def get_heatmap(
         for d in all_days:
             key = d.strftime("%Y-%m-%d")
             tasks_result[key] = tasks_by_day.get(d, 0)
-            focus_result[key] = round(focus_by_day.get(d, 0.0), 1)
+            focus_result[key] = round(focus_by_day.get(d, 0.0), 2)
 
         return {
             "tasks": tasks_result,
@@ -408,15 +408,15 @@ def get_line_chart(
                 tasks_arr, focus_arr = [], []
                 for m in range(1, 13):
                     tasks_arr.append(sum(v for k, v in tasks_by_day.items() if k.month == m and k.year == period_start.year))
-                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 1))
+                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 2))
             elif mode == 'month':
                 labels = [f"D.{d.day}" for d in days]
                 tasks_arr = [tasks_by_day.get(d, 0) for d in days]
-                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in days]
             else: # week
                 labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
                 tasks_arr = [tasks_by_day.get(d, 0) for d in days]
-                focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in days]
 
             return {"labels": labels, "tasks": tasks_arr, "focus": focus_arr}
 

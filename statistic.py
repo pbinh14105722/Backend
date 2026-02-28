@@ -259,18 +259,24 @@ def get_donut_chart(
                     if val <= 0:
                         continue
 
+                    # Dùng round(val, 2) để giữ độ chính xác cho giá trị nhỏ
+                    rounded_val = round(val, 2) if is_focus else int(val)
+                    # Bỏ qua nếu sau khi round vẫn = 0
+                    if rounded_val <= 0:
+                        continue
+
                     if pid == 0:
                         # Sessions không gắn project
                         items.append({
                             "name": "No Project",
-                            "value": round(val, 1) if is_focus else int(val),
+                            "value": rounded_val,
                             "color": "#6b7280",
                         })
                     else:
                         project = project_map.get(pid)
                         items.append({
                             "name": project.name if project else "Unknown",
-                            "value": round(val, 1) if is_focus else int(val),
+                            "value": rounded_val,
                             "color": (project.color if project and project.color else "#3f3f46"),
                         })
 

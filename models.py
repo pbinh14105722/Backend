@@ -118,23 +118,12 @@ class PomodoroSettings(Base):
     auto_start_focus = Column(Boolean, nullable=False, default=False)
     auto_start_break = Column(Boolean, nullable=False, default=False)
 
-# class PomodoroSession(Base):
-#     __tablename__ = "pomodoro_sessions"
-
-#     id           = Column(Integer, primary_key=True, autoincrement=True)
-#     user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-#     mode         = Column(String(20), nullable=False)
-#     duration     = Column(Integer, nullable=False)
-#     task_id      = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
-#     completed_at = Column(DateTime(timezone=True), nullable=False)
-
 class PomodoroSession(Base):
     __tablename__ = "pomodoro_sessions"
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
-    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True) # Thêm index
-    mode         = Column(String(20), nullable=False, index=True) # Thêm index (focus/break)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    mode         = Column(String(20), nullable=False)
     duration     = Column(Integer, nullable=False)
     task_id      = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
-    task_name    = Column(String(255), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=False, index=True) # Thêm index để filter theo ngày
+    completed_at = Column(DateTime(timezone=True), nullable=False)

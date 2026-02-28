@@ -136,5 +136,5 @@ class PomodoroSession(Base):
     mode         = Column(String(20), nullable=False, index=True) # Thêm index (focus/break)
     duration     = Column(Integer, nullable=False)
     task_id      = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
-    task_name    = Column(String(255), nullable=False)
+    task_name    = Column(String(255), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=False, index=True) # Thêm index để filter theo ngày

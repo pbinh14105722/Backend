@@ -241,27 +241,38 @@ def get_donut_chart(
                     tasks_by_project[h.project_id] += 1
 
             for s in all_sessions:
-                if not s.task_id:
-                    continue
                 d = to_date(s.completed_at)
                 if period_start <= d <= period_end:
-                    pid = get_task_project(s.task_id)
+                    pid = None
+                    if s.task_id:
+                        pid = get_task_project(s.task_id)
+                    # Nếu không có task_id hoặc task không thuộc project nào,
+                    # gán vào nhóm "no_project" (key = 0)
                     if pid:
                         focus_by_project[pid] += s.duration / 3600
+                    else:
+                        focus_by_project[0] += s.duration / 3600
 
             def to_items(data, is_focus=False):
                 items = []
                 for pid, val in data.items():
                     if val <= 0:
                         continue
-        
-                    project = project_map.get(pid)
-                    items.append({
-                        "name": project.name if project else "Unknown",
-                        "value": round(val, 1) if is_focus else int(val),
-                        # Đổi màu mặc định sang màu tối (#3f3f46) để không bị lóa trên Dark Mode
-                        "color": (project.color if project and project.color else "#3f3f46"),
-                    })
+
+                    if pid == 0:
+                        # Sessions không gắn project
+                        items.append({
+                            "name": "No Project",
+                            "value": round(val, 1) if is_focus else int(val),
+                            "color": "#6b7280",
+                        })
+                    else:
+                        project = project_map.get(pid)
+                        items.append({
+                            "name": project.name if project else "Unknown",
+                            "value": round(val, 1) if is_focus else int(val),
+                            "color": (project.color if project and project.color else "#3f3f46"),
+                        })
 
                 # Sắp xếp từ cao xuống thấp để Frontend lấy Top Project dễ dàng hơn
                 items.sort(key=lambda x: x["value"], reverse=True)

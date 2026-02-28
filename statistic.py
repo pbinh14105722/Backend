@@ -219,6 +219,10 @@ def get_donut_chart(
             models.PomodoroSession.mode == 'focus'
         ).all()
 
+        print(f"[DONUT] DEBUG: User {user_id} has {len(all_sessions)} focus sessions")
+        for s in all_sessions:
+            print(f"[DONUT] Session ID {s.id}: task_id={s.task_id}, duration={s.duration}, completed_at={s.completed_at}")
+
         # Cache task->project mapping
         task_project_cache = {}
         def get_task_project(task_id):
@@ -238,12 +242,16 @@ def get_donut_chart(
 
             for s in all_sessions:
                 if not s.task_id:
+                    print(f"[DONUT] Skipping session {s.id}: no task_id")
                     continue
                 d = to_date(s.completed_at)
+                print(f"[DONUT] Session {s.id}: date={d}, period={period_start} to {period_end}")
                 if period_start <= d <= period_end:
                     pid = get_task_project(s.task_id)
+                    print(f"[DONUT] Session {s.id}: task_id={s.task_id}, project_id={pid}, duration={s.duration}")
                     if pid:
                         focus_by_project[pid] += s.duration / 3600
+                        print(f"[DONUT] Added {s.duration/3600} hours to project {pid}")
 
             def to_items(data, is_focus=False):
                 items = []

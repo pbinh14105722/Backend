@@ -372,17 +372,22 @@ def get_line_chart(
             focus_by_day = defaultdict(float)
             tasks_by_day = defaultdict(int)
 
+            # Filter theo period_start/period_end thay vì dùng toàn bộ data
             for s in all_sessions:
-                focus_by_day[to_date(s.completed_at)] += s.duration / 3600
+                d = to_date(s.completed_at)
+                if period_start <= d <= period_end:
+                    focus_by_day[d] += s.duration / 3600
             for h in all_history:
-                tasks_by_day[to_date(h.completed_at)] += 1
+                d = to_date(h.completed_at)
+                if period_start <= d <= period_end:
+                    tasks_by_day[d] += 1
 
             if mode == 'year':
                 labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                 tasks_arr, focus_arr = [], []
                 for m in range(1, 13):
-                    tasks_arr.append(sum(v for k, v in tasks_by_day.items() if k.month == m))
-                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m), 1))
+                    tasks_arr.append(sum(v for k, v in tasks_by_day.items() if k.month == m and k.year == period_start.year))
+                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 1))
             elif mode == 'month':
                 labels = [f"D.{d.day}" for d in days]
                 tasks_arr = [tasks_by_day.get(d, 0) for d in days]

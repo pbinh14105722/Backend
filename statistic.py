@@ -92,131 +92,22 @@ def get_user_projects(user_id: int, db: Session):
 
 # ========== SUMMARY ==========
 
-# @router.get("/summary")
-# def get_summary(
-#     db: Session = Depends(database.get_db),
-#     current_user: models.User = Depends(get_current_user)
-# ):
-#     try:
-#         today = datetime.now(timezone.utc).date()
-#         user_id = current_user.id
-
-#         all_history = db.query(models.TaskHistory).filter(
-#             models.TaskHistory.user_id == user_id
-#         ).all()
-
-#         all_sessions = db.query(models.PomodoroSession).filter(
-#             models.PomodoroSession.user_id == user_id,
-#             models.PomodoroSession.mode == 'focus'
-#         ).all()
-
-#         projects = get_user_projects(user_id, db)
-#         project_ids = [p.id for p in projects]
-#         all_tasks = db.query(models.Task).filter(
-#             models.Task.project_id.in_(project_ids)
-#         ).all() if project_ids else []
-
-#         def build_dataset(period_start, period_end, prev_start, prev_end, group_by):
-#             period_days = days_in_range(period_start, period_end)
-
-#             tasks_by_day = defaultdict(int)
-#             focus_by_day = defaultdict(float)
-#             pomo_by_day = defaultdict(int)
-
-#             for h in all_history:
-#                 d = to_date(h.completed_at)
-#                 if period_start <= d <= period_end:
-#                     tasks_by_day[d] += 1
-
-#             for s in all_sessions:
-#                 d = to_date(s.completed_at)
-#                 if period_start <= d <= period_end:
-#                     focus_by_day[d] += s.duration / 3600
-#                     pomo_by_day[d] += 1
-
-#             if group_by == 'year':
-#                 tasks_arr, focus_arr, pomo_arr = [], [], []
-#                 for month in range(1, 13):
-#                     t = sum(v for k, v in tasks_by_day.items() if k.month == month and k.year == period_start.year)
-#                     f = sum(v for k, v in focus_by_day.items() if k.month == month and k.year == period_start.year)
-#                     p = sum(v for k, v in pomo_by_day.items() if k.month == month and k.year == period_start.year)
-#                     tasks_arr.append(t)
-#                     focus_arr.append(round(f, 1))
-#                     pomo_arr.append(p)
-#             else:
-#                 tasks_arr = [tasks_by_day.get(d, 0) for d in period_days]
-#                 focus_arr = [round(focus_by_day.get(d, 0.0), 1) for d in period_days]
-#                 pomo_arr = [pomo_by_day.get(d, 0) for d in period_days]
-
-#             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
-#             created = done + len(all_tasks)
-
-#             # Streak được cộng khi có task hoàn thành HOẶC pomodoro focus hoàn thành trong ngày
-#             active_days = set(k for k, v in tasks_by_day.items() if v > 0)
-#             active_days.update(set(k for k, v in pomo_by_day.items() if v > 0))
-#             streak, best_streak = compute_streak(active_days, period_start, period_end)
-
-#             prev_tasks = sum(1 for h in all_history if prev_start <= to_date(h.completed_at) <= prev_end)
-#             prev_focus = sum(s.duration / 3600 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
-#             prev_pomo = sum(1 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
-
-#             return {
-#                 "tasks": tasks_arr,
-#                 "focus": focus_arr,
-#                 "pomo": pomo_arr,
-#                 "created": created,
-#                 "done": done,
-#                 "streak": streak,
-#                 "bestStreak": best_streak,
-#                 "prevTasks": prev_tasks,
-#                 "prevFocus": round(prev_focus, 1),
-#                 "prevPomo": prev_pomo,
-#             }
-
-#         w_start, w_end = get_week_range(today)
-#         pw_start = w_start - timedelta(weeks=1)
-#         pw_end = w_end - timedelta(weeks=1)
-
-#         m_start, m_end = get_month_range(today)
-#         pm_start, pm_end = get_month_range(m_start - timedelta(days=1))
-
-#         y_start, y_end = get_year_range(today)
-#         py_start, py_end = get_year_range(date(today.year - 1, 1, 1))
-
-#         return {
-#             "week": build_dataset(w_start, w_end, pw_start, pw_end, 'week'),
-#             "month": build_dataset(m_start, m_end, pm_start, pm_end, 'month'),
-#             "year": build_dataset(y_start, y_end, py_start, py_end, 'year'),
-#         }
-
-#     except Exception as e:
-#         print(f"[SUMMARY] ❌ {str(e)}")
-#         raise HTTPException(status_code=500, detail="Failed to generate summary data")
-
 @router.get("/summary")
 def get_summary(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     try:
-        # 1. QUAN TRỌNG: Làm mới session để lấy dữ liệu vừa save từ DB
-        db.expire_all() 
-        
         today = datetime.now(timezone.utc).date()
         user_id = current_user.id
 
-        # 2. TỐI ƯU: Chỉ lấy dữ liệu từ đầu năm ngoái trở đi (giảm tải memory)
-        start_date_limit = datetime(today.year - 1, 1, 1)
-
         all_history = db.query(models.TaskHistory).filter(
-            models.TaskHistory.user_id == user_id,
-            models.TaskHistory.completed_at >= start_date_limit
+            models.TaskHistory.user_id == user_id
         ).all()
 
         all_sessions = db.query(models.PomodoroSession).filter(
             models.PomodoroSession.user_id == user_id,
-            models.PomodoroSession.mode == 'focus',
-            models.PomodoroSession.completed_at >= start_date_limit
+            models.PomodoroSession.mode == 'focus'
         ).all()
 
         projects = get_user_projects(user_id, db)
@@ -240,7 +131,6 @@ def get_summary(
             for s in all_sessions:
                 d = to_date(s.completed_at)
                 if period_start <= d <= period_end:
-                    # Chuyển giây sang giờ
                     focus_by_day[d] += s.duration / 3600
                     pomo_by_day[d] += 1
 
@@ -261,11 +151,11 @@ def get_summary(
             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
             created = done + len(all_tasks)
 
+            # Streak được cộng khi có task hoàn thành HOẶC pomodoro focus hoàn thành trong ngày
             active_days = set(k for k, v in tasks_by_day.items() if v > 0)
             active_days.update(set(k for k, v in pomo_by_day.items() if v > 0))
             streak, best_streak = compute_streak(active_days, period_start, period_end)
 
-            # Sửa lỗi logic tính prev_focus: Lấy từ all_sessions thay vì lặp lại query
             prev_tasks = sum(1 for h in all_history if prev_start <= to_date(h.completed_at) <= prev_end)
             prev_focus = sum(s.duration / 3600 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
             prev_pomo = sum(1 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
@@ -300,8 +190,9 @@ def get_summary(
         }
 
     except Exception as e:
-        print(f"[SUMMARY] ❌ Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
+        print(f"[SUMMARY] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate summary data")
+
 
 # ========== DONUT CHART ==========
 
@@ -328,10 +219,6 @@ def get_donut_chart(
             models.PomodoroSession.mode == 'focus'
         ).all()
 
-        print(f"[DONUT] DEBUG: User {user_id} has {len(all_sessions)} focus sessions")
-        for s in all_sessions:
-            print(f"[DONUT] Session ID {s.id}: task_id={s.task_id}, duration={s.duration}, completed_at={s.completed_at}")
-
         # Cache task->project mapping
         task_project_cache = {}
         def get_task_project(task_id):
@@ -351,16 +238,12 @@ def get_donut_chart(
 
             for s in all_sessions:
                 if not s.task_id:
-                    print(f"[DONUT] Skipping session {s.id}: no task_id")
                     continue
                 d = to_date(s.completed_at)
-                print(f"[DONUT] Session {s.id}: date={d}, period={period_start} to {period_end}")
                 if period_start <= d <= period_end:
                     pid = get_task_project(s.task_id)
-                    print(f"[DONUT] Session {s.id}: task_id={s.task_id}, project_id={pid}, duration={s.duration}")
                     if pid:
                         focus_by_project[pid] += s.duration / 3600
-                        print(f"[DONUT] Added {s.duration/3600} hours to project {pid}")
 
             def to_items(data, is_focus=False):
                 items = []

@@ -66,7 +66,10 @@ def to_date(dt):
     return dt.replace(tzinfo=timezone.utc).date()
 
 def compute_streak(active_days: set, period_start: date, period_end: date):
-    days = days_in_range(period_start, period_end)
+    today = datetime.now(timezone.utc).date()
+    # Giới hạn period_end tới ngày hôm nay để không đếm ngày tương lai
+    effective_end = min(period_end, today)
+    days = days_in_range(period_start, effective_end)
     best = 0
     current = 0
     for d in days:
@@ -75,6 +78,7 @@ def compute_streak(active_days: set, period_start: date, period_end: date):
             best = max(best, current)
         else:
             current = 0
+    # Current streak: đếm ngược từ hôm nay (hoặc effective_end), không phải cuối period
     streak = 0
     for d in reversed(days):
         if d in active_days:

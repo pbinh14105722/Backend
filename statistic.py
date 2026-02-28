@@ -151,7 +151,9 @@ def get_summary(
             done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
             created = done + len(all_tasks)
 
+            # Streak được cộng khi có task hoàn thành HOẶC pomodoro focus hoàn thành trong ngày
             active_days = set(k for k, v in tasks_by_day.items() if v > 0)
+            active_days.update(set(k for k, v in pomo_by_day.items() if v > 0))
             streak, best_streak = compute_streak(active_days, period_start, period_end)
 
             prev_tasks = sum(1 for h in all_history if prev_start <= to_date(h.completed_at) <= prev_end)

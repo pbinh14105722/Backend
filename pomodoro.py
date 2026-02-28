@@ -147,38 +147,80 @@ def get_tasks(
     return [{"id": t.id, "name": t.name} for t in tasks]
 
 
-# POST /pomodoro/sessions — Lưu session hoàn thành
+# # POST /pomodoro/sessions — Lưu session hoàn thành
+# @router.post("/pomodoro/sessions", status_code=status.HTTP_201_CREATED)
+# def create_session(
+#     data: PomodoroSessionSchema,
+#     db: Session = Depends(database.get_db),
+#     current_user: models.User = Depends(get_current_user)
+# ):
+#     print(f"[POMODORO] POST session - User {current_user.id}, mode={data.mode}")
+
+#     session = models.PomodoroSession(
+#         user_id=current_user.id,
+#         mode=data.mode,
+#         duration=data.duration,
+#         task_id=data.task_id,
+#         completed_at=data.completed_at or datetime.utcnow()
+#     )
+
+#     try:
+#         db.add(session)
+
+#         # Nếu là focus session và có task_id -> cộng thêm duration vào time_spent_seconds của task
+#         if data.mode == "focus" and data.task_id is not None:
+#             task = db.query(models.Task).filter(models.Task.id == data.task_id).first()
+#             if task:
+#                 task.time_spent_seconds = (task.time_spent_seconds or 0) + data.duration
+#                 print(f"[POMODORO] ⏱ Updated task {task.id} time_spent_seconds += {data.duration} -> {task.time_spent_seconds}")
+
+#         db.commit()
+#         db.refresh(session)
+#         print(f"[POMODORO] ✅ Session saved ID {session.id}")
+#         return {"message": "Session saved!", "id": session.id}
+#     except Exception as e:
+#         db.rollback()
+#         print(f"[POMODORO] ❌ Lỗi: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu session: {str(e)}")
+
 @router.post("/pomodoro/sessions", status_code=status.HTTP_201_CREATED)
 def create_session(
     data: PomodoroSessionSchema,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    print(f"[POMODORO] POST session - User {current_user.id}, mode={data.mode}")
-
-    session = models.PomodoroSession(
+    # 1. Lưu session mới
+    new_session = models.PomodoroSession(
         user_id=current_user.id,
         mode=data.mode,
         duration=data.duration,
         task_id=data.task_id,
-        completed_at=data.completed_at or datetime.utcnow()
+        task_name=data.task_name,
+        completed_at=datetime.utcnow()
     )
+    
+    db.add(new_session)
 
-    try:
-        db.add(session)
+    # 2. Cập nhật thời gian vào Task (nếu có)
+    if data.mode == "focus" and data.task_id:
+        task = db.query(models.Task).filter(models.Task.id == data.task_id).first()
+        if task:
+            task.time_spent_seconds = (task.time_spent_seconds or 0) + data.duration
 
-        # Nếu là focus session và có task_id -> cộng thêm duration vào time_spent_seconds của task
-        if data.mode == "focus" and data.task_id is not None:
-            task = db.query(models.Task).filter(models.Task.id == data.task_id).first()
-            if task:
-                task.time_spent_seconds = (task.time_spent_seconds or 0) + data.duration
-                print(f"[POMODORO] ⏱ Updated task {task.id} time_spent_seconds += {data.duration} -> {task.time_spent_seconds}")
+    db.commit()
+    db.refresh(new_session)
 
-        db.commit()
-        db.refresh(session)
-        print(f"[POMODORO] ✅ Session saved ID {session.id}")
-        return {"message": "Session saved!", "id": session.id}
-    except Exception as e:
-        db.rollback()
-        print(f"[POMODORO] ❌ Lỗi: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu session: {str(e)}")
+    # 3. Tính toán nhanh focus_hours_today để trả về cho Frontend cập nhật UI ngay
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    total_focus_today = db.query(models.PomodoroSession).filter(
+        models.PomodoroSession.user_id == current_user.id,
+        models.PomodoroSession.mode == 'focus',
+        models.PomodoroSession.completed_at >= today_start
+    ).with_entities(models.func.sum(models.PomodoroSession.duration)).scalar() or 0
+
+    return {
+        "message": "Session saved",
+        "session_id": new_session.id,
+        "focus_hours_today": round(total_focus_today / 3600, 2), # Trả về số giờ
+        "focus_seconds_today": total_focus_today
+    }

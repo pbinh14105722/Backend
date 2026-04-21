@@ -1,0 +1,434 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+from jose import jwt, JWTError
+from datetime import datetime, timezone, timedelta, date
+from collections import defaultdict
+import hashlib
+import models, database
+from utils import SECRET_KEY, ALGORITHM
+
+router = APIRouter(prefix="/statistic")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+
+# ========== AUTH ==========
+def get_current_user(
+    db: Session = Depends(database.get_db),
+    token: str = Depends(oauth2_scheme)
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+# ========== HELPERS ==========
+
+def get_week_range(ref: date):
+    start = ref - timedelta(days=ref.weekday())
+    end = start + timedelta(days=6)
+    return start, end
+
+def get_month_range(ref: date):
+    start = ref.replace(day=1)
+    if ref.month == 12:
+        end = ref.replace(year=ref.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        end = ref.replace(month=ref.month + 1, day=1) - timedelta(days=1)
+    return start, end
+
+def get_year_range(ref: date):
+    return ref.replace(month=1, day=1), ref.replace(month=12, day=31)
+
+def days_in_range(start: date, end: date):
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)]
+
+def to_date(dt):
+    """Convert datetime sang date, handle cả naive và aware"""
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo:
+        return dt.date()
+    return dt.replace(tzinfo=timezone.utc).date()
+
+def compute_streak(active_days: set, period_start: date, period_end: date):
+    today = datetime.now(timezone.utc).date()
+    # Giới hạn period_end tới ngày hôm nay để không đếm ngày tương lai
+    effective_end = min(period_end, today)
+    days = days_in_range(period_start, effective_end)
+    best = 0
+    current = 0
+    for d in days:
+        if d in active_days:
+            current += 1
+            best = max(best, current)
+        else:
+            current = 0
+    # Current streak: đếm ngược từ hôm nay (hoặc effective_end), không phải cuối period
+    streak = 0
+    for d in reversed(days):
+        if d in active_days:
+            streak += 1
+        else:
+            break
+    return streak, best
+
+def get_user_projects(user_id: int, db: Session):
+    return db.query(models.Item).filter(
+        models.Item.owner_id == user_id,
+        models.Item.type == 'PROJECT'
+    ).all()
+
+
+# ========== SUMMARY ==========
+
+@router.get("/summary")
+def get_summary(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        user_id = current_user.id
+
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id
+        ).all()
+
+        all_sessions = db.query(models.PomodoroSession).filter(
+            models.PomodoroSession.user_id == user_id,
+            models.PomodoroSession.mode == 'focus'
+        ).all()
+
+        projects = get_user_projects(user_id, db)
+        project_ids = [p.id for p in projects]
+        all_tasks = db.query(models.Task).filter(
+            models.Task.project_id.in_(project_ids)
+        ).all() if project_ids else []
+
+        def build_dataset(period_start, period_end, prev_start, prev_end, group_by):
+            period_days = days_in_range(period_start, period_end)
+
+            tasks_by_day = defaultdict(int)
+            focus_by_day = defaultdict(float)
+            pomo_by_day = defaultdict(int)
+
+            for h in all_history:
+                d = to_date(h.completed_at)
+                if period_start <= d <= period_end:
+                    tasks_by_day[d] += 1
+
+            for s in all_sessions:
+                d = to_date(s.completed_at)
+                if period_start <= d <= period_end:
+                    focus_by_day[d] += s.duration / 3600
+                    pomo_by_day[d] += 1
+
+            if group_by == 'year':
+                tasks_arr, focus_arr, pomo_arr = [], [], []
+                for month in range(1, 13):
+                    t = sum(v for k, v in tasks_by_day.items() if k.month == month and k.year == period_start.year)
+                    f = sum(v for k, v in focus_by_day.items() if k.month == month and k.year == period_start.year)
+                    p = sum(v for k, v in pomo_by_day.items() if k.month == month and k.year == period_start.year)
+                    tasks_arr.append(t)
+                    focus_arr.append(round(f, 2))
+                    pomo_arr.append(p)
+            else:
+                tasks_arr = [tasks_by_day.get(d, 0) for d in period_days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in period_days]
+                pomo_arr = [pomo_by_day.get(d, 0) for d in period_days]
+
+            done = sum(1 for h in all_history if period_start <= to_date(h.completed_at) <= period_end)
+            created = done + len(all_tasks)
+
+            # Streak được cộng khi có task hoàn thành HOẶC pomodoro focus hoàn thành trong ngày
+            active_days = set(k for k, v in tasks_by_day.items() if v > 0)
+            active_days.update(set(k for k, v in pomo_by_day.items() if v > 0))
+            streak, best_streak = compute_streak(active_days, period_start, period_end)
+
+            prev_tasks = sum(1 for h in all_history if prev_start <= to_date(h.completed_at) <= prev_end)
+            prev_focus = sum(s.duration / 3600 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
+            prev_pomo = sum(1 for s in all_sessions if prev_start <= to_date(s.completed_at) <= prev_end)
+
+            return {
+                "tasks": tasks_arr,
+                "focus": focus_arr,
+                "pomo": pomo_arr,
+                "created": created,
+                "done": done,
+                "streak": streak,
+                "bestStreak": best_streak,
+                "prevTasks": prev_tasks,
+                "prevFocus": round(prev_focus, 2),
+                "prevPomo": prev_pomo,
+            }
+
+        w_start, w_end = get_week_range(today)
+        pw_start = w_start - timedelta(weeks=1)
+        pw_end = w_end - timedelta(weeks=1)
+
+        m_start, m_end = get_month_range(today)
+        pm_start, pm_end = get_month_range(m_start - timedelta(days=1))
+
+        y_start, y_end = get_year_range(today)
+        py_start, py_end = get_year_range(date(today.year - 1, 1, 1))
+
+        return {
+            "week": build_dataset(w_start, w_end, pw_start, pw_end, 'week'),
+            "month": build_dataset(m_start, m_end, pm_start, pm_end, 'month'),
+            "year": build_dataset(y_start, y_end, py_start, py_end, 'year'),
+        }
+
+    except Exception as e:
+        print(f"[SUMMARY] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate summary data")
+
+
+# ========== DONUT CHART ==========
+
+@router.get("/donut_chart")
+def get_donut_chart(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        user_id = current_user.id
+
+        projects = get_user_projects(user_id, db)
+        project_map = {p.id: p for p in projects}
+        project_ids = list(project_map.keys())
+
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id,
+            models.TaskHistory.project_id.in_(project_ids)
+        ).all() if project_ids else []
+
+        all_sessions = db.query(models.PomodoroSession).filter(
+            models.PomodoroSession.user_id == user_id,
+            models.PomodoroSession.mode == 'focus'
+        ).all()
+
+        # Cache task->project mapping
+        task_project_cache = {}
+        def get_task_project(task_id):
+            if task_id not in task_project_cache:
+                task = db.query(models.Task).filter(models.Task.id == task_id).first()
+                task_project_cache[task_id] = task.project_id if task else None
+            return task_project_cache[task_id]
+
+        def build_donut(period_start, period_end):
+            tasks_by_project = defaultdict(int)
+            focus_by_project = defaultdict(float)
+
+            for h in all_history:
+                d = to_date(h.completed_at)
+                if period_start <= d <= period_end:
+                    tasks_by_project[h.project_id] += 1
+
+            for s in all_sessions:
+                d = to_date(s.completed_at)
+                if period_start <= d <= period_end:
+                    pid = None
+                    if s.task_id:
+                        pid = get_task_project(s.task_id)
+                    # Nếu không có task_id hoặc task không thuộc project nào,
+                    # gán vào nhóm "no_project" (key = 0)
+                    if pid:
+                        focus_by_project[pid] += s.duration / 3600
+                    else:
+                        focus_by_project[0] += s.duration / 3600
+
+            def to_items(data, is_focus=False):
+                items = []
+                for pid, val in data.items():
+                    if val <= 0:
+                        continue
+
+                    # Dùng round(val, 2) để giữ độ chính xác cho giá trị nhỏ
+                    rounded_val = round(val, 2) if is_focus else int(val)
+                    # Bỏ qua nếu sau khi round vẫn = 0
+                    if rounded_val <= 0:
+                        continue
+
+                    if pid == 0:
+                        # Sessions không gắn project
+                        items.append({
+                            "name": "No Project",
+                            "value": rounded_val,
+                            "color": "#6b7280",
+                        })
+                    else:
+                        project = project_map.get(pid)
+                        items.append({
+                            "name": project.name if project else "Unknown",
+                            "value": rounded_val,
+                            "color": (project.color if project and project.color else "#3f3f46"),
+                        })
+
+                # Sắp xếp từ cao xuống thấp để Frontend lấy Top Project dễ dàng hơn
+                items.sort(key=lambda x: x["value"], reverse=True)
+    
+                # KHÔNG thực hiện đoạn check if len(items) > 5 ở đây nữa.
+                # Trả về toàn bộ danh sách để Frontend tự xử lý hàm donutBuildSegments() của nó.
+                return items
+
+            return {
+                "tasks": to_items(tasks_by_project, False),
+                "focus": to_items(focus_by_project, True),
+            }
+
+        # Donut chart: lấy 7 ngày trước, 30 ngày trước, 365 ngày trước (tính từ hôm nay)
+        w_start = today - timedelta(days=6)   # 7 ngày gần nhất (hôm nay - 6 ngày)
+        w_end = today
+        m_start = today - timedelta(days=29)  # 30 ngày gần nhất (hôm nay - 29 ngày)
+        m_end = today
+        y_start = today - timedelta(days=364) # 365 ngày gần nhất (hôm nay - 364 ngày)
+        y_end = today
+
+        return {
+            "week": build_donut(w_start, w_end),
+            "month": build_donut(m_start, m_end),
+            "year": build_donut(y_start, y_end),
+        }
+
+    except Exception as e:
+        print(f"[DONUT] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate donut chart data")
+
+
+# ========== HEATMAP ==========
+
+@router.get("/heatmap")
+def get_heatmap(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        start = today - timedelta(days=364)
+        user_id = current_user.id
+
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id
+        ).all()
+
+        all_sessions = db.query(models.PomodoroSession).filter(
+            models.PomodoroSession.user_id == user_id,
+            models.PomodoroSession.mode == 'focus'
+        ).all()
+
+        tasks_by_day = defaultdict(int)
+        focus_by_day = defaultdict(float)
+
+        for h in all_history:
+            d = to_date(h.completed_at)
+            if start <= d <= today:
+                tasks_by_day[d] += 1
+
+        for s in all_sessions:
+            d = to_date(s.completed_at)
+            if start <= d <= today:
+                focus_by_day[d] += s.duration / 3600
+
+        all_days = days_in_range(start, today)
+        tasks_result = {}
+        focus_result = {}
+
+        for d in all_days:
+            key = d.strftime("%Y-%m-%d")
+            tasks_result[key] = tasks_by_day.get(d, 0)
+            focus_result[key] = round(focus_by_day.get(d, 0.0), 2)
+
+        return {
+            "tasks": tasks_result,
+            "focus": focus_result,
+        }
+
+    except Exception as e:
+        print(f"[HEATMAP] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate heatmap data")
+
+
+# ========== LINE CHART (placeholder) ==========
+
+@router.get("/line_chart")
+def get_line_chart(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        user_id = current_user.id
+
+        # Lấy dữ liệu thô từ DB (Tối ưu: Chỉ lấy trong khoảng cần thiết)
+        y_start, _ = get_year_range(today)
+        all_sessions = db.query(models.PomodoroSession).filter(
+            models.PomodoroSession.user_id == user_id,
+            models.PomodoroSession.mode == 'focus',
+            models.PomodoroSession.completed_at >= y_start
+        ).all()
+        
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id,
+            models.TaskHistory.completed_at >= y_start
+        ).all()
+
+        def build_full_dataset(period_start, period_end, mode='week'):
+            days = days_in_range(period_start, period_end)
+            focus_by_day = defaultdict(float)
+            tasks_by_day = defaultdict(int)
+
+            # Filter theo period_start/period_end thay vì dùng toàn bộ data
+            for s in all_sessions:
+                d = to_date(s.completed_at)
+                if period_start <= d <= period_end:
+                    focus_by_day[d] += s.duration / 3600
+            for h in all_history:
+                d = to_date(h.completed_at)
+                if period_start <= d <= period_end:
+                    tasks_by_day[d] += 1
+
+            if mode == 'year':
+                labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                tasks_arr, focus_arr = [], []
+                for m in range(1, 13):
+                    tasks_arr.append(sum(v for k, v in tasks_by_day.items() if k.month == m and k.year == period_start.year))
+                    focus_arr.append(round(sum(v for k, v in focus_by_day.items() if k.month == m and k.year == period_start.year), 2))
+            elif mode == 'month':
+                labels = [f"D.{d.day}" for d in days]
+                tasks_arr = [tasks_by_day.get(d, 0) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in days]
+            else: # week
+                labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                tasks_arr = [tasks_by_day.get(d, 0) for d in days]
+                focus_arr = [round(focus_by_day.get(d, 0.0), 2) for d in days]
+
+            return {"labels": labels, "tasks": tasks_arr, "focus": focus_arr}
+
+        w_start, w_end = get_week_range(today)
+        m_start, m_end = get_month_range(today)
+        y_start, y_end = get_year_range(today)
+
+        return {
+            "week": build_full_dataset(w_start, w_end, 'week'),
+            "month": build_full_dataset(m_start, m_end, 'month'),
+            "year": build_full_dataset(y_start, y_end, 'year'),
+        }
+    except Exception as e:
+        print(f"[LINE CHART] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")

@@ -349,19 +349,31 @@ MESSAGE: Vietnamese → "✅ Đã cập nhật roadmap **[name]**: [mô tả ng�
 # SECTION 6 — SMART ANALYSIS
 type = "statistic", data = null
 
-TRIGGERS: "summarize", "analyze", "how am I doing", "report", "overdue", "progress", "time spent"
+TRIGGERS: "summarize", "analyze", "how am I doing", "report", "overdue", "progress", "time spent", "trễ", "chậm", "sắp đến hạn", "late", "behind"
 
 Calculate from actual workspace data:
 - Consider tasks with "due: None" as HAVING NO DEADLINE (Never overdue).
 - A task is "overdue" ONLY IF: 'due_date' < today AND 'progress' < 100. (Note: today's date provided above is in UTC, so allow a 1-day flexibility for user's local timezone).
+- A task is "upcoming" IF: today ≤ due_date ≤ today + 7 days AND progress < 100.
+- upcoming_count = number of upcoming tasks (due within 7 days, not yet complete).
 - Total tasks vs completed (progress=100), avg progress.
 - High-priority not started (priority="high" AND progress=0), time invested (sum time_spent_seconds → hours).
 
 Message structure:
 **📋 Executive Summary** — 1 sentence with real numbers on overall health.
-**📊 Key Metrics** — table: Total Tasks | Completed | Overdue | Time Invested | High Priority Pending.
+**📊 Key Metrics** — table: Total Tasks | Completed | Overdue | Upcoming (7 days) | Time Invested | High Priority Pending.
 **⚠️ Issues & Bottlenecks** — specific problems naming projects/tasks and numbers.
-**✅ Recommendations** — 2-4 n  ext steps naming specific tasks.
+**🔔 Sắp đến hạn** — list all upcoming tasks (due within 7 days, progress < 100), showing name | due_date | progress%. If none, write "Không có task nào sắp đến hạn trong 7 ngày tới."
+**💡 AI Suggestions** — MUST follow this logic:
+  - If upcoming_count >= 3 (NHIỀU task sắp đến hạn):
+    → Write: "⚡ Bạn đang có [upcoming_count] task sắp đến hạn — áp lực cao. Gợi ý:"
+    → Then give 3-4 concrete suggestions focused on: prioritization (tackle highest-priority/easiest first), time-blocking, delegating or deferring low-priority items, and avoiding multitasking.
+    → Name specific tasks from the user's data in the suggestions.
+  - If upcoming_count < 3 (ÍT hoặc KHÔNG CÓ task sắp đến hạn):
+    → Write: "✅ Lịch của bạn đang khá thoải mái với [upcoming_count] task sắp đến hạn. Gợi ý:"
+    → Then give 3-4 concrete suggestions focused on: using free time to get ahead on future tasks, improving quality/documentation of in-progress work, planning next sprint, or picking up a stalled high-priority task.
+    → Name specific tasks from the user's data in the suggestions.
+**✅ Recommendations** — 2-4 next steps naming specific tasks.
 
 If workspace empty: respond warmly, guide to add first project.
 

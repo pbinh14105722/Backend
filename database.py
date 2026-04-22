@@ -26,7 +26,7 @@ load_dotenv()
 # DATABASE CONFIGURATION - Loaded from environment variables
 # =============================================================================
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError(
         "DATABASE_URL not found in environment variables! "

@@ -625,6 +625,60 @@ Other tasks in this project for calibration:
 
 # ========== ROUTES ==========
 
+@router.get("/chatbot/deadline-summary", summary="Lấy tasks sắp hạn / trễ hạn")
+def get_deadline_summary(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    GET /chatbot/deadline-summary
+    Trả về tasks urgent / soon / overdue của user — không gọi AI, chỉ tính từ DB.
+    Frontend dùng để hiển thị banner cảnh báo deadline mà không tốn token.
+    """
+    from datetime import date
+
+    project_ids = [
+        i.id for i in db.query(models.Item).filter(
+            models.Item.owner_id == current_user.id,
+            models.Item.type == "PROJECT"
+        ).all()
+    ]
+
+    if not project_ids:
+        return {"urgent": [], "soon": [], "overdue": []}
+
+    tasks = db.query(models.Task).filter(
+        models.Task.project_id.in_(project_ids),
+        models.Task.due_date.isnot(None),
+        models.Task.progress < 100
+    ).all()
+
+    today = datetime.now(timezone.utc).date()
+
+    urgent, soon, overdue = [], [], []
+
+    for task in tasks:
+        due = task.due_date
+        if hasattr(due, 'date'):
+            due = due.date()
+        diff = (due - today).days
+
+        entry = {
+            "name":     task.name,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
+            "progress": task.progress,
+            "priority": task.priority,
+        }
+
+        if diff < 0:
+            overdue.append(entry)
+        elif diff <= 2:
+            urgent.append(entry)
+        elif diff <= 7:
+            soon.append(entry)
+
+    return {"urgent": urgent, "soon": soon, "overdue": overdue}
+
 @router.post("/chatbot", summary="Gửi tin nhắn tới AI")
 def send_message(
     data: schemas.ChatMessageSend,

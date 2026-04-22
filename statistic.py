@@ -432,3 +432,148 @@ def get_line_chart(
     except Exception as e:
         print(f"[LINE CHART] ❌ {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+# ========== BAR CHART: ON-TIME COMPLETION ==========
+
+@router.get("/bar_chart")
+def get_bar_chart(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    try:
+        today = datetime.now(timezone.utc).date()
+        user_id = current_user.id
+
+        # Lấy tất cả projects của user
+        projects = get_user_projects(user_id, db)
+        project_map = {p.id: p for p in projects}
+        project_ids = list(project_map.keys())
+
+        # Nếu không có project → trả về response rỗng hợp lệ
+        def empty_period(labels):
+            return {"labels": labels, "projects": []}
+
+        w_start, w_end = get_week_range(today)
+        m_start, m_end = get_month_range(today)
+        y_start, y_end = get_year_range(today)
+
+        week_labels  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        month_labels = [f"D.{d.day}" for d in days_in_range(m_start, m_end)]
+        year_labels  = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        if not project_ids:
+            return {
+                "week":  empty_period(week_labels),
+                "month": empty_period(month_labels),
+                "year":  empty_period(year_labels),
+            }
+
+        # Chỉ lấy history có due_date (bản ghi mới — bỏ qua bản ghi cũ không có due_date)
+        all_history = db.query(models.TaskHistory).filter(
+            models.TaskHistory.user_id == user_id,
+            models.TaskHistory.project_id.in_(project_ids),
+            models.TaskHistory.due_date.isnot(None)
+        ).all()
+
+        def build_bar(period_start, period_end, mode):
+            """
+            Trả về dict:
+            {
+              "labels": [...],
+              "projects": [
+                { "id": ..., "name": ..., "color": ...,
+                  "data": [{"on_time": int, "late": int}, ...] }
+              ]
+            }
+            """
+            # Xác định bucket keys theo mode
+            if mode == 'week':
+                labels = week_labels
+                # Tạo list 7 date objects trong tuần
+                period_days = days_in_range(period_start, period_end)
+                def bucket_key(d: date):
+                    # weekday(): Mon=0 ... Sun=6
+                    return d.weekday()
+                n_buckets = 7
+
+            elif mode == 'month':
+                period_days = days_in_range(period_start, period_end)
+                labels = [f"D.{d.day}" for d in period_days]
+                def bucket_key(d: date):
+                    return d.day - 1  # 0-indexed
+                n_buckets = len(period_days)
+
+            else:  # year
+                labels = year_labels
+                def bucket_key(d: date):
+                    return d.month - 1  # 0-indexed, Jan=0
+                n_buckets = 12
+
+            # Lọc history thuộc period này
+            period_history = [
+                h for h in all_history
+                if period_start <= to_date(h.completed_at) <= period_end
+            ]
+
+            # Gom dữ liệu: { project_id: { bucket_idx: {"on_time": N, "late": N} } }
+            data_map = defaultdict(lambda: defaultdict(lambda: {"on_time": 0, "late": 0}))
+
+            for h in period_history:
+                completed = h.completed_at
+                due       = h.due_date
+
+                # Đảm bảo cả hai đều aware để so sánh được
+                if completed.tzinfo is None:
+                    completed = completed.replace(tzinfo=timezone.utc)
+                if due.tzinfo is None:
+                    due = due.replace(tzinfo=timezone.utc)
+
+                comp_date = to_date(completed)
+                idx = bucket_key(comp_date)
+
+                if completed <= due:
+                    data_map[h.project_id][idx]["on_time"] += 1
+                else:
+                    data_map[h.project_id][idx]["late"] += 1
+
+            # Chỉ trả về projects có ít nhất 1 bản ghi trong period này
+            active_project_ids = set(data_map.keys())
+
+            projects_out = []
+            for pid in active_project_ids:
+                project = project_map.get(pid)
+                if not project:
+                    continue
+
+                # Tạo array đủ n_buckets, mặc định 0/0
+                data_arr = []
+                for i in range(n_buckets):
+                    bucket = data_map[pid].get(i, {"on_time": 0, "late": 0})
+                    data_arr.append({
+                        "on_time": bucket["on_time"],
+                        "late":    bucket["late"],
+                    })
+
+                projects_out.append({
+                    "id":    pid,
+                    "name":  project.name,
+                    "color": project.color if project.color else "#6366f1",
+                    "data":  data_arr,
+                })
+
+            # Sắp xếp theo tên project cho nhất quán
+            projects_out.sort(key=lambda p: p["name"])
+
+            return {"labels": labels, "projects": projects_out}
+
+        return {
+            "week":  build_bar(w_start, w_end, 'week'),
+            "month": build_bar(m_start, m_end, 'month'),
+            "year":  build_bar(y_start, y_end, 'year'),
+        }
+
+    except Exception as e:
+        print(f"[BAR CHART] ❌ {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate bar chart data")

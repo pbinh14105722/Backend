@@ -120,6 +120,7 @@ class TaskHistory(Base):
     project_id   = Column(String, nullable=False)
     task_name    = Column(String(255), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=False)
+    due_date     = Column(DateTime(timezone=True), nullable=True)
 
 #==============================POMODORO===========================================
 class PomodoroSettings(Base):

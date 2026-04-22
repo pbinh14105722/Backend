@@ -238,13 +238,16 @@ def delete_task(
     deleted_position = db_task.position
     
     try:
-        history = models.TaskHistory(
-            user_id=current_user.id,
-            project_id=projectId,
-            task_name=db_task.name,
-            completed_at=datetime.now(timezone.utc)
-        )
-        db.add(history)
+        # Chỉ ghi lịch sử nếu task chưa được đánh dấu hoàn thành trước đó
+        if not db_task.is_completed:
+            history = models.TaskHistory(
+                user_id=current_user.id,
+                project_id=projectId,
+                task_name=db_task.name,
+                completed_at=datetime.now(timezone.utc),
+                due_date=db_task.due_date
+            )
+            db.add(history)
         
         # Xóa task
         db.delete(db_task)
@@ -336,6 +339,9 @@ def update_task(
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
+    # Lưu lại trạng thái is_completed trước khi cập nhật
+    was_completed = db_task.is_completed
+    
     update_data = task_data.model_dump(exclude_unset=True)
     
     if 'time_spent' in update_data:
@@ -351,6 +357,18 @@ def update_task(
         setattr(db_task, key, value)
     
     try:
+        # Nếu task được đánh dấu hoàn thành (False -> True)
+        is_newly_completed = (not was_completed) and db_task.is_completed
+        if is_newly_completed:
+            history = models.TaskHistory(
+                user_id=current_user.id,
+                project_id=projectId,
+                task_name=db_task.name,
+                completed_at=datetime.now(timezone.utc),
+                due_date=db_task.due_date
+            )
+            db.add(history)
+
         db.commit()
         db.refresh(db_task)
         
@@ -360,3 +378,85 @@ def update_task(
         db.rollback()
         print(f"[UPDATE TASK] ❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi cập nhật task: {str(e)}")
+
+# 6. POST - Dự đoán độ khó của task bằng AI
+# Rate limit: mỗi task chỉ được estimate lại sau ít nhất ESTIMATE_COOLDOWN_SECONDS giây
+ESTIMATE_COOLDOWN_SECONDS = 30
+
+@router.post("/{projectId}/items/{id}/estimate-difficulty", response_model=schemas.TaskResponse)
+def estimate_difficulty(
+    projectId: str,
+    id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    print(f"[ESTIMATE DIFFICULTY] User {current_user.id} estimating task {id} in project {projectId}")
+
+    verify_project_owner(projectId, current_user.id, db)
+
+    db_task = db.query(models.Task).filter(
+        models.Task.id == id,
+        models.Task.project_id == projectId
+    ).first()
+
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # ── Rate limit ────────────────────────────────────────────────────────────
+    # Nếu task đã được estimate gần đây, trả về giá trị cũ luôn (không gọi AI)
+    last_estimated = getattr(db_task, "last_estimated_at", None)
+    if last_estimated:
+        if last_estimated.tzinfo is None:
+            last_estimated = last_estimated.replace(tzinfo=timezone.utc)
+        elapsed = (datetime.now(timezone.utc) - last_estimated).total_seconds()
+        if elapsed < ESTIMATE_COOLDOWN_SECONDS:
+            wait = int(ESTIMATE_COOLDOWN_SECONDS - elapsed)
+            print(f"[ESTIMATE DIFFICULTY] ⏳ Rate limited — task {id} estimated {int(elapsed)}s ago, cooldown {wait}s left")
+            raise HTTPException(
+                status_code=429,
+                detail=f"Task vừa được estimate {int(elapsed)}s trước. Vui lòng chờ thêm {wait}s."
+            )
+
+    # ── Build context ─────────────────────────────────────────────────────────
+    # Lấy TẤT CẢ task khác trong project (cả completed lẫn active) để AI có
+    # bức tranh đầy đủ hơn về độ phức tạp chung của project.
+    context_tasks = db.query(models.Task).filter(
+        models.Task.project_id == projectId,
+        models.Task.id != id,
+    ).order_by(models.Task.position.asc()).all()
+
+    context_lines = []
+    for t in context_tasks:
+        status_label = "completed" if t.is_completed else "active"
+        priority_label = t.priority or "low"
+        time_str = f"{t.time_spent_seconds}s" if t.time_spent_seconds else "not started"
+        context_lines.append(
+            f"- [{status_label}] {t.name} | priority: {priority_label} | time_spent: {time_str}"
+        )
+
+    context_str = "\n".join(context_lines)
+
+    # Lấy tên project để truyền vào AI làm domain context
+    project_item = db.query(models.Item).filter(models.Item.id == projectId).first()
+    project_name = project_item.name if project_item else ""
+
+    print(f"[ESTIMATE DIFFICULTY] Task: '{db_task.name}' | Project: '{project_name}' | Context tasks: {len(context_lines)}")
+
+    # ── Gọi AI ────────────────────────────────────────────────────────────────
+    from chatbot import estimate_task_difficulty
+    new_difficulty = estimate_task_difficulty(db_task.name, context_str, project_name)
+
+    # ── Lưu DB ───────────────────────────────────────────────────────────────
+    db_task.difficulty_rating = new_difficulty
+    if hasattr(db_task, "last_estimated_at"):
+        db_task.last_estimated_at = datetime.now(timezone.utc)
+
+    try:
+        db.commit()
+        db.refresh(db_task)
+        print(f"[ESTIMATE DIFFICULTY] ✅ Task {id} ('{db_task.name}') → difficulty {new_difficulty}/5")
+        return format_task_response(db_task)
+    except Exception as e:
+        db.rollback()
+        print(f"[ESTIMATE DIFFICULTY] ❌ DB error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu độ khó: {str(e)}")

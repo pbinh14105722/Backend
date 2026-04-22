@@ -1,0 +1,1919 @@
+/* ==========================================================================
+   ROADMAP BUILDER — STYLES
+   Design: đồng nhất với statistics / pomodoro (base.css)
+   ========================================================================== */
+
+/* ── Missing vars not in base.css (defined in sidebar_nav.css but declared
+      here too for safety) ─────────────────────────────────────────────────── */
+:root {
+    --bg-primary:   #0f0f13;
+    --bg-secondary: #1a1a20;
+    --border-light: #3f3f46;
+}
+
+/* ==========================================================================
+   SIDEBAR_NAV — chỉ những phần roadmap thực sự dùng
+   (trích từ sidebar_nav.css, bỏ: global reset, :root vars, .sidebar-nav layout,
+    .sidebar-actions, .add-button, .modal-more, drag-ghost, modal overlay/box,
+    color-palette, confirm-box, sidebar-overlay/toggle-btn, responsive blocks)
+   ========================================================================== */
+
+/* ── Folder container & list wrapper ────────────────────────────────────── */
+.folder-container {
+    flex: 1;
+    padding: 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.list-wrapper {
+    width: 100%;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── Folder item (parent) ────────────────────────────────────────────────── */
+.folder-item {
+    width: 100%;
+    margin-bottom: 4px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.folder-item div.item-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 5px;
+    margin: 0;
+    background-color: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.folder-item div.item-header:hover {
+    background-color: var(--bg-hover);
+}
+
+.folder-item div.item-header:active {
+    transform: scale(0.98);
+}
+
+.folder-item div.item-header p.label {
+    position: relative;
+    flex: 1;
+    margin-left: 0;
+    margin-right: auto;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Folder icons */
+.folder-item div.item-header svg {
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    margin-right: 4px;
+}
+
+.folder-item div.item-header svg.folder-icon {
+    width: 22px;
+    height: 22px;
+}
+
+.folder-item div.item-header svg.folder-icon path {
+    stroke-width: 0;
+    fill-opacity: 0.9;
+    transition: fill 0.2s ease;
+}
+
+.folder-item div.item-header:hover svg.folder-icon path {
+    fill-opacity: 1;
+}
+
+/* Expand/collapse chevrons */
+.folder-item div.item-header svg.icon-collapsed,
+.folder-item div.item-header svg.icon-expanded {
+    width: 15px;
+    height: 15px;
+    margin-right: 4px;
+}
+
+.folder-item div.item-header svg polyline {
+    fill: none;
+    stroke: var(--text-secondary);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.folder-item div.item-header:hover svg polyline {
+    stroke: var(--text-primary);
+}
+
+.folder-item div.item-header svg.icon-expanded {
+    display: none;
+}
+
+.folder-item.is-expanded div.item-header svg.icon-collapsed {
+    display: none;
+}
+
+.folder-item.is-expanded div.item-header svg.icon-expanded {
+    display: block;
+}
+
+/* Folder content (children) */
+.folder-item div.item-content {
+    display: none;
+    margin-left: 12px;
+    background-color: transparent;
+    animation: sn-slideDown 0.2s ease;
+}
+
+.folder-item.is-expanded > .item-content {
+    display: block;
+}
+
+.folder-item:hover > div.item-content {
+    border-left: 1px solid var(--border-color);
+    margin-left: 11px;
+}
+
+@keyframes sn-slideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.item-content .list-wrapper {
+    min-height: 10px;
+}
+
+/* ── Project item (child / leaf) ─────────────────────────────────────────── */
+.project-item-child {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 5px;
+    margin-left: 0;
+    background-color: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.project-item-child:hover {
+    background-color: var(--bg-hover);
+}
+
+.project-item-child:active {
+    transform: scale(0.98);
+}
+
+.project-item-child p {
+    flex: 1;
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-item-child svg.project-icon {
+    width: 10px;
+    height: 10px;
+    margin-right: 10px;
+    margin-left: 5px;
+    flex-shrink: 0;
+}
+
+.project-item-child svg.project-icon circle {
+    stroke-width: 0;
+    filter: drop-shadow(0 0 3px currentColor);
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
+}
+
+.project-item-child:hover svg.project-icon circle {
+    opacity: 1;
+}
+
+/* ── Accessibility ───────────────────────────────────────────────────────── */
+.folder-item div.item-header:focus-visible,
+.project-item-child:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* ── Override base.css body — roadmap cần full-height, không padding ─────── */
+html, body {
+    height: 100%;
+    overflow: hidden;
+    padding: 0 !important;   /* base.css sets padding: 32px 24px 48px */
+    background-color: #0e0d12;
+    background-image:
+        radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(135deg, #0e0d12 0%, #1a1625 100%);
+    background-size: 28px 28px, 100% 100%;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+button { font-family: inherit; cursor: pointer; }
+a      { text-decoration: none; }
+input  { font-family: inherit; }
+
+/* ── Page header (same pattern as statistics .page-header) ───────────────── */
+.rm-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    background: var(--bg-primary);
+}
+
+.rm-page-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Save indicator dot */
+.rm-save-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: transparent;
+    transition: background 0.3s ease;
+    flex-shrink: 0;
+}
+
+.rm-save-dot.saving { background: #f59e0b; animation: rm-pulse 1s infinite; }
+.rm-save-dot.saved  { background: #22c55e; }
+.rm-save-dot.error  { background: #ef4444; }
+
+@keyframes rm-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+
+.rm-save-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* Override base.css — thu nhỏ nút quay lại cho vừa với header compact */
+.rm-page-header .close-btn {
+    padding: 4px 10px;
+    font-size: 13px;
+}
+
+/* ── App Layout ──────────────────────────────────────────────────────────── */
+.rm-app-content {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#rm-app {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── Sidebar shared ─────────────────────────────────────────────────────── */
+.sb-head {
+    padding: 12px 14px 8px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.sb-head--between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sb-head-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+.sb-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sb-body::-webkit-scrollbar { width: 3px; }
+.sb-body::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 3px;
+}
+
+/* ── COMBINED RIGHT PANEL ────────────────────────────────────────────────── */
+#sb-combined {
+    width: 240px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    overflow: hidden;
+}
+
+/* ── TOP PANEL inside combined: Roadmaps ─────────────────────────────────── */
+#sb-right {
+    flex: 1;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── RESIZER drag handle ──────────────────────────────────────────────────── */
+.rm-resizer {
+    height: 6px;
+    flex-shrink: 0;
+    background: var(--border-color);
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    position: relative;
+    z-index: 5;
+}
+
+.rm-resizer:hover,
+.rm-resizer.dragging {
+    background: rgba(99, 102, 241, 0.4);
+}
+
+.rm-resizer-handle {
+    width: 28px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--text-tertiary);
+    opacity: 0.5;
+    transition: opacity 0.15s;
+}
+
+.rm-resizer:hover .rm-resizer-handle,
+.rm-resizer.dragging .rm-resizer-handle {
+    opacity: 1;
+    background: #a5b4fc;
+}
+
+/* ── BOTTOM PANEL inside combined: Components ────────────────────────────── */
+#sb-left {
+    flex: 1;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-top: none;
+}
+
+/* Drag cursor cho items */
+#sb-left .project-item-child        { cursor: grab; }
+#sb-left .project-item-child:active { cursor: grabbing; opacity: 0.6; }
+#sb-left .folder-drag-area          { cursor: grab; flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; }
+#sb-left .folder-drag-area:active   { cursor: grabbing; opacity: 0.6; }
+
+.sb-search-wrap {
+    position: relative;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.sb-search-icon {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 13px;
+    height: 13px;
+    color: var(--text-tertiary);
+    pointer-events: none;
+}
+
+.sb-search-input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.sb-search-input::placeholder { color: var(--text-tertiary); }
+.sb-search-input:focus { border-color: rgba(99, 102, 241, 0.5); }
+
+/* ── Tree items ──────────────────────────────────────────────────────────── */
+.rm-tree,
+.rm-tree ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.rm-tree { padding: 6px 0 12px; }
+
+/* Section label */
+.tree-section {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 8px 14px 4px;
+}
+
+/* Folder item */
+.tree-folder {
+    margin-bottom: 2px;
+}
+
+.tree-folder-hdr {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 14px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.tree-folder-hdr:hover { background: var(--bg-hover); }
+
+.tree-chevron {
+    width: 12px;
+    height: 12px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.tree-folder.is-expanded > .tree-folder-hdr .tree-chevron {
+    transform: rotate(90deg);
+}
+
+.tree-folder-children {
+    display: none;
+    padding-left: 10px;
+}
+
+.tree-folder.is-expanded > .tree-folder-children { display: block; }
+
+/* Draggable row (folder header + leaf items) */
+.tree-drag-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+    draggable: true;
+}
+
+.tree-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.tree-folder-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.tree-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    transition: color 0.15s;
+}
+
+.tree-folder-hdr:hover .tree-name { color: var(--text-primary); }
+
+/* Leaf items (project / task) */
+.tree-leaf {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px 5px 14px;
+    cursor: grab;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.tree-leaf:hover {
+    background: var(--bg-hover);
+}
+
+.tree-leaf:hover .tree-name { color: var(--text-primary); }
+.tree-leaf:active { opacity: 0.55; cursor: grabbing; }
+
+/* Folder drag handle area */
+.tree-folder-drag {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+    cursor: grab;
+}
+
+.tree-folder-drag:active { cursor: grabbing; opacity: 0.6; }
+
+/* Empty state inside tree */
+.tree-empty {
+    padding: 20px 14px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+}
+
+/* ── CANVAS ──────────────────────────────────────────────────────────────── */
+#rm-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    position: relative;
+}
+
+#cw {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    /* background: var(--bg-primary); */
+    background-color: #0e0d12;
+    background-image:
+      radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(135deg, #0e0d12 0%, #1a1625 100%);
+    background-size: 28px 28px, 100% 100%;
+}
+
+#cw.panning { cursor: grabbing; }
+
+#canvas-transform {
+    position: absolute;
+    top: 0; left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+#edge-svg {
+    position: absolute;
+    top: 0; left: 0;
+    overflow: visible;
+    z-index: 2;
+    pointer-events: none;
+}
+
+#cnv {
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 3;
+}
+
+/* ── Nodes ───────────────────────────────────────────────────────────────── */
+.nd {
+    position: absolute;
+    min-width: 152px;
+    max-width: 180px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-light);
+    background: var(--bg-secondary);
+    padding: 10px 12px 11px;
+    user-select: none;
+    cursor: move;
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.nd:hover { border-color: rgba(99, 102, 241, 0.4); }
+
+.nd.sel {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2),
+                0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.nd-hdr {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+}
+
+.nd-ico {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+.nd-lbl {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.nd-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.nd-sub {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-top: 3px;
+}
+
+/* Delete button (shown when selected) */
+.nd-del {
+    position: absolute;
+    top: 5px; right: 6px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    font-size: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.1s;
+    padding: 0;
+}
+
+.nd-del svg { width: 10px; height: 10px; pointer-events: none; }
+.nd-del:hover { background: rgba(239, 68, 68, 0.28); }
+.nd.sel .nd-del { display: flex; }
+
+/* Ports */
+.ports {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.nd:hover .ports,
+.nd.sel .ports,
+.nd.port-active .ports { opacity: 1; }
+
+.port {
+    position: absolute;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    border: 2px solid var(--bg-primary);
+    cursor: crosshair;
+    pointer-events: all;
+    z-index: 4;
+    transition: transform 0.1s, background 0.1s;
+}
+
+.port:hover          { transform: scale(1.35); background: #22c55e; }
+.port.port-pending   { background: #f59e0b; transform: scale(1.2); }
+
+.port[data-p=top]    { top: -6px;          left: calc(50% - 6px); }
+.port[data-p=bottom] { bottom: -6px;       left: calc(50% - 6px); }
+.port[data-p=left]   { left: -6px;         top: calc(50% - 6px); }
+.port[data-p=right]  { right: -6px;        top: calc(50% - 6px); }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+#empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0.18;
+    gap: 14px;
+    z-index: 0;
+}
+
+#empty-state svg { width: 52px; height: 52px; color: var(--text-secondary); }
+
+#empty-state p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.7;
+}
+
+/* ── Zoom badge ──────────────────────────────────────────────────────────── */
+#zoom-badge {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    z-index: 10;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ── Hint bar ────────────────────────────────────────────────────────────── */
+#hint-bar {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26, 26, 32, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 5px 16px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    z-index: 10;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* ── Mini toolbar ────────────────────────────────────────────────────────── */
+#mini-toolbar {
+    position: absolute;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(26, 26, 32, 0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    padding: 5px 10px;
+    z-index: 10;
+    box-shadow: var(--shadow-lg);
+}
+
+.mt-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.mt-btn svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.mt-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.mt-btn--danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+}
+
+.mt-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border-color);
+    margin: 0 2px;
+}
+
+/* ── Save status overlay (top-right corner of canvas) ───────────────────── */
+.rm-save-status {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ── Roadmap list button ─────────────────────────────────────────────────── */
+.btn-new-rm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--accent-primary);
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.btn-new-rm svg { width: 11px; height: 11px; }
+
+.btn-new-rm:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Roadmap list items */
+.rm-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin: 0 8px 6px;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    transition: border-color 0.12s, background 0.12s;
+    overflow: hidden;
+}
+
+.rm-item:first-child { margin-top: 8px; }
+
+.rm-item:hover { border-color: var(--border-light); }
+
+.rm-item.active {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.07);
+}
+
+.rm-item-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px 5px;
+}
+
+.rm-color-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rm-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rm-title-input {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--accent-primary);
+    color: var(--text-primary);
+    outline: none;
+    padding: 0 2px;
+    font-family: inherit;
+}
+
+.rm-item-btns {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.rm-item:hover .rm-item-btns { opacity: 1; }
+
+.rm-btn {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s;
+    padding: 0;
+}
+
+.rm-btn svg { width: 12px; height: 12px; pointer-events: none; }
+.rm-btn:hover         { background: var(--bg-hover); color: var(--text-primary); }
+.rm-btn.danger:hover  { background: rgba(239,68,68,.15); color: #ef4444; }
+
+.rm-meta {
+    padding: 0 10px 7px;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    display: flex;
+    gap: 10px;
+}
+
+.rm-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rm-meta-item svg {
+    width: 10px; height: 10px;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.rm-list-empty {
+    padding: 24px 14px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+/* ── Edge popup ──────────────────────────────────────────────────────────── */
+#edge-popup {
+    position: fixed;
+    background: rgba(22, 22, 28, 0.97);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    z-index: 999;
+    display: none;
+    min-width: 240px;
+    box-shadow: var(--shadow-xl), 0 0 0 1px rgba(99,102,241,0.1);
+}
+
+.ep-close {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s;
+    padding: 0;
+}
+
+.ep-close svg { width: 13px; height: 13px; pointer-events: none; }
+.ep-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.ep-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-right: 24px;
+}
+
+.ep-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.ep-row--label { align-items: center; }
+
+.ep-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    width: 68px;
+    flex-shrink: 0;
+}
+
+.ep-btns {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+}
+
+.ep-b {
+    flex: 1;
+    height: 28px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+    padding: 0 6px;
+}
+
+.ep-b svg {
+    width: 100%;
+    max-width: 28px;
+    height: 10px;
+    pointer-events: none;
+}
+
+.ep-b:hover { background: var(--bg-hover); border-color: var(--border-light); }
+
+.ep-b.on {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #a5b4fc;
+}
+
+.ep-input {
+    flex: 1;
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.ep-input::placeholder { color: var(--text-tertiary); }
+.ep-input:focus { border-color: rgba(99, 102, 241, 0.5); }
+
+.ep-del {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #ef4444;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.ep-del svg { width: 13px; height: 13px; pointer-events: none; }
+.ep-del:hover { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.5); }
+
+/* ── Drag-over highlight on canvas ──────────────────────────────────────── */
+#cw.drag-over {
+    background-image: radial-gradient(rgba(99, 102, 241, 0.12) 1px, transparent 1px);
+}
+
+/* ── Touch drag ghosts ───────────────────────────────────────────────────── */
+/* 1. Source indicator: element gốc mờ + viền đứt khi đang bị kéo */
+.drag-ghost {
+    opacity: 0.35 !important;
+    border: 1px dashed var(--accent-primary) !important;
+    background-color: var(--bg-hover) !important;
+}
+
+/* 2. Touch drag ghost — self-contained, không phụ thuộc CSS context của sidebar */
+.touch-drag-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    white-space: nowrap;
+    max-width: 240px;
+    overflow: hidden;
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--accent-primary);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    transform: scale(1.05);
+    transition: none;
+}
+.touch-drag-ghost .ghost-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+.touch-drag-ghost .ghost-icon--dot {
+    width: 10px;
+    height: 10px;
+}
+.touch-drag-ghost .ghost-label {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Mobile bottom bar (hidden on desktop) ───────────────────────────────── */
+#rm-mobile-bar { display: none; }
+
+/* ── Responsive (mobile) ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+    /* ── Layout: flex column to stack ── */
+    html, body {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .rm-app-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    #rm-app {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+        height: auto;
+    }
+
+    /* ── Combined panel: children (#sb-left, #sb-right) fixed-positioned on mobile;
+         unwrap parent so its box doesn't interfere ── */
+    #sb-combined {
+        display: contents;
+    }
+    /* Resizer handle chỉ có nghĩa ở desktop — ẩn trên mobile */
+    #rm-resizer {
+        display: none;
+    }
+
+    /* ── LEFT SIDEBAR (components) — fixed slide-up from bottom ── */
+    #sb-left {
+        position: fixed;
+        bottom: 52px;
+        left: 0;
+        right: 0;
+        top: auto;
+        width: 100%;
+        height: auto;
+        flex: none;
+        min-height: unset;
+        z-index: 60;
+        max-height: 0;
+        overflow: hidden;
+        border: none;
+        border-top: 1px solid var(--border-color);
+        border-radius: 0;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        background: var(--bg-secondary);
+    }
+
+    #sb-left.mob-open {
+        max-height: 30vh;
+    }
+
+    /* ── RIGHT SIDEBAR (roadmaps) — fixed slide-up from bottom ── */
+    #sb-right {
+        position: fixed;
+        bottom: 52px;
+        left: 0;
+        right: 0;
+        top: auto;
+        width: 100%;
+        height: auto;
+        flex: none;
+        min-height: unset;
+        z-index: 60;
+        max-height: 0;
+        overflow: hidden;
+        border: none;
+        border-top: 1px solid var(--border-color);
+        border-radius: 0;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        background: var(--bg-secondary);
+    }
+
+    #sb-right.mob-open {
+        max-height: 30vh;
+    }
+
+    /* ── Sidebar headers ── */
+    #sb-left .sb-head,
+    #sb-right .sb-head {
+        flex-shrink: 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    /* ── Sidebar bodies (scrollable) ── */
+    #sb-left .sb-body,
+    #sb-right .sb-body {
+        flex: 1;
+        overflow-y: auto;
+        max-height: calc(30vh - 50px);
+    }
+
+    /* ── Mobile bottom bar ─────────────────────────────────────────── */
+    #rm-mobile-bar {
+        order: 3;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+        flex-shrink: 0;
+        width: 100%;
+        height: 52px;
+        background: rgba(22, 22, 28, 0.98);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-top: 1px solid var(--border-light);
+        padding: 0 12px;
+        z-index: 50;
+        gap: 8px;
+        margin-top: auto;
+    }
+
+    /* Accent line */
+    #rm-mobile-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(99, 102, 241, 0.5) 30%,
+            rgba(124, 58, 237, 0.6) 50%,
+            rgba(99, 102, 241, 0.5) 70%,
+            transparent 100%
+        );
+        pointer-events: none;
+    }
+
+    /* ── Mobile toggle buttons ── */
+    .mob-tog {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 5px 12px;
+        height: 36px;
+        min-width: 0;
+        flex: 1;
+        max-width: none;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-light);
+        background: transparent;
+        color: var(--text-tertiary);
+        font-size: 11px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+        cursor: pointer;
+    }
+
+    .mob-tog svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+
+    .mob-tog:active {
+        transform: scale(0.95);
+    }
+
+    .mob-tog.active {
+        background: rgba(99, 102, 241, 0.15);
+        border-color: rgba(99, 102, 241, 0.5);
+        color: #a5b4fc;
+    }
+
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+::-webkit-scrollbar:horizontal { display: none; }
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-track:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-track:hover ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* ==========================================================================
+   ENTRANCE ANIMATIONS
+   ========================================================================== */
+
+@keyframes rm-fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes rm-fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes rm-scaleIn {
+    from { opacity: 0; transform: scale(0.88) translateY(6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes rm-slideInLeft {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes rm-slideInRight {
+    from { opacity: 0; transform: translateX(14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes rm-toolbarUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(14px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Page-level entrance */
+#sb-combined {
+    animation: rm-slideInRight 0.32s ease both;
+    animation-delay: 0.05s;
+}
+
+#rm-main {
+    animation: rm-fadeIn 0.35s ease both;
+    animation-delay: 0.08s;
+}
+
+#mini-toolbar {
+    animation: rm-toolbarUp 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.18s;
+}
+
+#hint-bar {
+    animation: rm-toolbarUp 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.24s;
+}
+
+/* Node drop-in when first placed on canvas */
+.nd.nd-new {
+    animation: rm-scaleIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Sidebar tree items stagger */
+.tree-folder,
+.tree-leaf {
+    animation: rm-fadeUp 0.22s ease both;
+}
+
+.tree-folder:nth-child(1) { animation-delay: 0.04s; }
+.tree-folder:nth-child(2) { animation-delay: 0.08s; }
+.tree-folder:nth-child(3) { animation-delay: 0.12s; }
+.tree-folder:nth-child(4) { animation-delay: 0.16s; }
+.tree-folder:nth-child(5) { animation-delay: 0.20s; }
+
+
+/* ==========================================================================
+   SKELETON LOADING STATES
+   ========================================================================== */
+
+@keyframes rm-skeleton-wave {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+
+.rm-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-elevated, #1e1e24) 25%,
+        var(--bg-hover, #27272d) 50%,
+        var(--bg-elevated, #1e1e24) 75%
+    );
+    background-size: 200% 100%;
+    animation: rm-skeleton-wave 1.6s ease infinite;
+    border-radius: var(--radius-sm);
+}
+
+/* Left sidebar skeleton rows */
+.rm-sb-skeleton {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rm-sb-skeleton-folder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.rm-sb-skeleton-folder .sk-icon {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.rm-sb-skeleton-folder .sk-line {
+    height: 10px;
+    border-radius: 3px;
+    flex: 1;
+}
+
+.rm-sb-skeleton-leaf {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 4px 22px;
+}
+
+.rm-sb-skeleton-leaf .sk-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rm-sb-skeleton-leaf .sk-line {
+    height: 9px;
+    border-radius: 3px;
+}
+
+/* Right sidebar roadmap list skeleton */
+.rm-list-skeleton {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rm-list-skeleton-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.rm-list-skeleton-item .sk-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rm-list-skeleton-item .sk-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.rm-list-skeleton-item .sk-line { height: 10px; border-radius: 3px; }
+.rm-list-skeleton-item .sk-meta { height: 8px; border-radius: 3px; }
+
+/* Apply wave animation to all .rm-skeleton descendants */
+.rm-sb-skeleton .sk-icon,
+.rm-sb-skeleton .sk-line,
+.rm-sb-skeleton .sk-dot,
+.rm-list-skeleton-item .sk-dot,
+.rm-list-skeleton-item .sk-line,
+.rm-list-skeleton-item .sk-meta {
+    background: linear-gradient(
+        90deg,
+        var(--bg-elevated, #1e1e24) 25%,
+        var(--bg-hover, #27272d) 50%,
+        var(--bg-elevated, #1e1e24) 75%
+    );
+    background-size: 200% 100%;
+    animation: rm-skeleton-wave 1.6s ease infinite;
+    border-radius: var(--radius-sm);
+}
+
+/* Stagger delays for skeleton rows */
+.rm-sb-skeleton > *:nth-child(2) .sk-line,
+.rm-list-skeleton-item:nth-child(2) .sk-line { animation-delay: 0.1s; }
+.rm-sb-skeleton > *:nth-child(3) .sk-line,
+.rm-list-skeleton-item:nth-child(3) .sk-line { animation-delay: 0.2s; }
+.rm-sb-skeleton > *:nth-child(4) .sk-line,
+.rm-list-skeleton-item:nth-child(4) .sk-line { animation-delay: 0.3s; }
+
+/* ==========================================================================
+   OFFLINE / NETWORK ERROR STATES
+   ========================================================================== */
+
+/* Inline error in sidebars */
+.rm-load-error {
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.rm-load-error-icon {
+    width: 28px; height: 28px;
+    color: var(--accent-danger, #ef4444);
+    opacity: 0.7;
+}
+
+.rm-load-error-text {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+}
+
+.rm-load-error-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 2px;
+}
+
+.rm-load-error-retry:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.rm-load-error-retry svg {
+    width: 11px; height: 11px;
+    flex-shrink: 0;
+}
+
+/* Offline banner — top of canvas area */
+.rm-offline-banner {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 7px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+    font-size: 11px;
+    color: #fca5a5;
+    pointer-events: none;
+    animation: rm-fadeUp 0.25s ease both;
+}
+
+.rm-offline-banner svg {
+    width: 13px; height: 13px;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.rm-offline-banner.rm-offline-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-bottom-color: rgba(245, 158, 11, 0.25);
+    color: #fcd34d;
+}
+
+/* Canvas overlay when saving / loading roadmap data */
+.rm-canvas-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 15, 19, 0.55);
+    backdrop-filter: blur(2px);
+    animation: rm-fadeIn 0.2s ease both;
+    pointer-events: all;
+}
+
+.rm-canvas-overlay-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.rm-canvas-overlay-icon {
+    width: 28px; height: 28px;
+    border: 2.5px solid rgba(99, 102, 241, 0.25);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+}
+
+.rm-canvas-overlay-text {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+}
+
+/* ── AI Bar container (fixed bottom của #cw) ────────────────────────────── */
+#rm-ai-bar {
+    position: absolute;
+    bottom: 52px; /* trên hint-bar */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 14px;
+    width: min(560px, calc(100% - 48px));
+    background: rgba(20, 20, 28, 0.92);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 28px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(99,102,241,0.1);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+ 
+#rm-ai-bar.rm-ai-bar--hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(8px);
+}
+ 
+#rm-ai-bar.rm-ai-bar--loading {
+    border-color: rgba(99, 102, 241, 0.6);
+}
+ 
+/* ── Spark icon bên trái ─────────────────────────────────────────────────── */
+.rm-ai-bar__icon {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    color: var(--accent-primary, #818cf8);
+    opacity: 0.8;
+}
+ 
+/* ── Input ───────────────────────────────────────────────────────────────── */
+#rm-ai-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary, #e4e4e7);
+    font-size: 13px;
+    font-family: var(--font-sans, sans-serif);
+    line-height: 1.4;
+    resize: none;
+    height: 20px;
+    max-height: 80px;
+    overflow-y: hidden;
+}
+ 
+#rm-ai-input::placeholder {
+    color: var(--text-tertiary, #71717a);
+}
+ 
+/* ── Send button ─────────────────────────────────────────────────────────── */
+#rm-ai-send {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent-primary, #818cf8);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+ 
+#rm-ai-send:hover { background: #6366f1; }
+#rm-ai-send:active { transform: scale(0.92); }
+#rm-ai-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+ 
+#rm-ai-send svg { width: 14px; height: 14px; }
+ 
+/* ── Spinner thay send icon khi loading ──────────────────────────────────── */
+.rm-ai-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+}
+ 
+#rm-ai-bar.rm-ai-bar--loading .rm-ai-spinner { display: block; }
+#rm-ai-bar.rm-ai-bar--loading #rm-ai-send-arrow { display: none; }
+ 
+/* ── Toggle button (ở hint-bar area) ────────────────────────────────────── */
+#rm-ai-toggle {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    background: rgba(20, 20, 28, 0.85);
+    backdrop-filter: blur(8px);
+    color: var(--accent-primary, #818cf8);
+    font-size: 11px;
+    font-family: var(--font-sans, sans-serif);
+    cursor: pointer;
+    z-index: 20;
+    transition: border-color 0.15s, background 0.15s;
+}
+ 
+#rm-ai-toggle:hover {
+    border-color: rgba(99, 102, 241, 0.7);
+    background: rgba(30, 30, 40, 0.95);
+}
+ 
+#rm-ai-toggle svg { width: 12px; height: 12px; }
+ 
+/* ==========================================================================
+   PREVIEW BANNER — Hiện khi AI đã apply diff, chờ user confirm/cancel
+   ========================================================================== */
+ 
+#rm-preview-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    background: rgba(20, 20, 28, 0.95);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    font-size: 12px;
+    color: var(--text-secondary, #a1a1aa);
+    white-space: nowrap;
+    animation: rm-fadeUp 0.2s ease both;
+    pointer-events: all;
+}
+ 
+#rm-preview-banner.rm-preview-banner--hidden {
+    display: none;
+}
+ 
+.rm-preview-banner__label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+ 
+.rm-preview-banner__dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #f59e0b;
+    animation: rm-pulse 1.2s ease infinite;
+    flex-shrink: 0;
+}
+ 
+.rm-preview-banner__text {
+    color: var(--text-primary, #e4e4e7);
+    font-weight: 500;
+}
+ 
+.rm-preview-banner__actions {
+    display: flex;
+    gap: 6px;
+    margin-left: 4px;
+}
+ 
+.rm-preview-banner__btn {
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+ 
+.rm-preview-banner__btn:active { transform: scale(0.95); }
+ 
+.rm-preview-banner__btn--cancel {
+    background: rgba(255,255,255,0.07);
+    color: var(--text-secondary, #a1a1aa);
+    border: 1px solid var(--border-light, #3f3f46);
+}
+ 
+.rm-preview-banner__btn--cancel:hover { background: rgba(255,255,255,0.12); }
+ 
+.rm-preview-banner__btn--save {
+    background: var(--accent-primary, #818cf8);
+    color: #fff;
+}
+ 
+.rm-preview-banner__btn--save:hover { background: #6366f1; }
+ 
+/* Canvas lock khi đang preview */
+#cw.rm-preview-active {
+    pointer-events: none;
+}
+ 
+#cw.rm-preview-active #rm-preview-banner,
+#cw.rm-preview-active #rm-ai-bar {
+    pointer-events: all;
+}

@@ -133,5 +133,7 @@ def format_task_response(task: models.Task) -> dict:
         "due_date": format_datetime_iso(task.due_date),
         "time_spent": task.time_spent_seconds,
         "notes": task.notes,
-        "progress": task.progress or 0
+        "progress": task.progress or 0,
+        "is_completed": task.is_completed,
+        "difficulty_rating": task.difficulty_rating
     }

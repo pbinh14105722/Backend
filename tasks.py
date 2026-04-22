@@ -141,26 +141,37 @@ def get_project_tasks(
 
     if sort_settings and sort_settings.enabled:
         rules = json.loads(sort_settings.sort_config or "[]")
-        rules.sort(key=lambda r: r.get("order", 0))
+        rules.sort(key=lambda r: r.get("order", 0))  # order=1 lên đầu
 
         FIELD_MAP = {
             "name":       lambda t: (t.name or "").lower(),
-            "priority":   lambda t: {"high": 0, "medium": 1, "low": 2}.get(t.priority, 3),
-            "start_date": lambda t: t.start_date,
-            "due_date":   lambda t: t.due_date,
-            "time_spent": lambda t: t.time_spent_seconds,
+    
+            # ✅ Fix: low=0 → medium=1 → high=2
+            # ascending=True  → low → medium → high (tăng dần mức quan trọng)
+            # ascending=False → high → medium → low (giảm dần mức quan trọng)
+            "priority":   lambda t: {"low": 0, "medium": 1, "high": 2}.get(t.priority, -1),
+    
+            "start_date": lambda t: t.start_date or datetime.min,
+            "due_date":   lambda t: t.due_date or datetime.min,
+            "time_spent": lambda t: t.time_spent_seconds or 0,
         }
 
+        # Stable sort: lặp từ rule ưu tiên THẤP nhất → CAO nhất
+        # Python giữ nguyên thứ tự các phần tử bằng nhau (stable)
+        # → Rule order=1 sort cuối cùng sẽ là tiêu chí quyết định
         for rule in reversed(rules):
             field     = rule.get("field")
             ascending = rule.get("ascending", True)
             key_fn    = FIELD_MAP.get(field)
-            if key_fn:
-                try:
-                    tasks = sorted(tasks, key=key_fn, reverse=not ascending)
-                    print(f"[GET TASKS] Sort by '{field}' ascending={ascending}")
-                except Exception as e:
-                    print(f"[GET TASKS] ⚠️ Sort error on field '{field}': {e}")
+            if key_fn is None:
+                continue
+            try:
+                tasks = sorted(tasks, key=key_fn, reverse=not ascending)
+                print(f"[SORT] field='{field}' ascending={ascending}")
+            except TypeError:
+                print(f"[SORT] ⚠️ Không thể sort field '{field}', bỏ qua")
+
+        print(f"[SORT] ✅ {len(rules)} rules applied")
 
     return [format_task_response(task) for task in tasks]
 
@@ -259,14 +270,8 @@ def delete_task(
         raise HTTPException(status_code=500, detail=f"Lỗi khi xóa task: {str(e)}")
 
 
-@router.delete("/{projectId}/items/{id}/done")
-def done_task(
-    projectId: str,
-    id: int,
-    db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    return delete_task(projectId, id, db, current_user)
+# Đã loại bỏ API DELETE /{projectId}/items/{id}/done
+# Thay thế bằng logic PATCH { is_completed: true } trên route update_task
 
 # 4. PATCH - Cập nhật vị trí task (Reorder)
 @router.patch("/{projectId}/items/reorder", response_model=list[schemas.TaskResponse])

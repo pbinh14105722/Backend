@@ -85,6 +85,8 @@ class TaskCreate(BaseModel):
     start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     notes: Optional[str] = None
+    is_completed: Optional[bool] = False
+    difficulty_rating: Optional[int] = Field(default=0, ge=0, le=5)
 
     @field_validator('priority')
     @classmethod
@@ -102,6 +104,8 @@ class TaskUpdate(BaseModel):
     notes: Optional[str] = None
     progress: Optional[int] = Field(default=None, ge=0, le=100)
     process: Optional[int] = Field(default=None, ge=0, le=100)
+    is_completed: Optional[bool] = None
+    difficulty_rating: Optional[int] = Field(default=None, ge=0, le=5)
 
     @field_validator('priority')
     @classmethod
@@ -124,6 +128,8 @@ class TaskResponse(BaseModel):
     time_spent: int
     notes: str
     progress: int = 0
+    is_completed: bool
+    difficulty_rating: int
 
     class Config:
         from_attributes = True
@@ -438,4 +444,3 @@ class SaveRoadmapResponse(BaseModel):
     panY: float
     zoom: float
     created_items: List[CreatedItemResponse]
-

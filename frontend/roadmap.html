@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap - Manask</title>
+    <link rel="icon" href="../img/logo_web_v2.png" type="image/png">
+
+    <!-- Shared design tokens (same as statistics/pomodoro) -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css">
+    <!-- Roadmap-specific styles (includes all needed sidebar item styles) -->
+    <link rel="stylesheet" href="../css/sidebar_global.css">
+    <link rel="stylesheet" href="../css/roadmap.css">
+    <link rel="stylesheet" href="../css/hint_float.css">
+
+    <script type="module" src="../js/sidebar_global.js" defer></script>
+    <script type="module" src="../js/roadmap.js" defer></script>
+</head>
+<body>
+
+    <div class="app-content rm-app-content">
+
+    <!-- ── MAIN APP ────────────────────────────────────────────── -->
+    <div id="rm-app">
+
+        <!-- CANVAS -->
+        <main id="rm-main">
+            <div id="cw">
+                <div id="canvas-transform">
+                    <svg id="edge-svg">
+                        <defs id="svg-defs"></defs>
+                        <g id="edge-g"></g>
+                        <path id="prev-path" d="" stroke="var(--accent-primary)"
+                              stroke-width="1.5" stroke-dasharray="5,3"
+                              fill="none" opacity=".6" pointer-events="none"/>
+                    </svg>
+                    <div id="cnv"></div>
+                </div>
+
+                <!-- Offline banner (shown by JS) -->
+                <div id="rm-offline-banner" class="rm-offline-banner" style="display:none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+                        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <line x1="12" y1="20" x2="12.01" y2="20"/>
+                    </svg>
+                    Không có kết nối mạng — các thay đổi chưa được lưu
+                </div>
+
+                <!-- Empty state -->
+                <div id="empty-state">
+                    <svg viewBox="0 0 64 64" fill="none">
+                        <rect x="4"  y="4"  width="24" height="24" rx="4"
+                              stroke="currentColor" stroke-width="1.5"/>
+                        <rect x="36" y="4"  width="24" height="24" rx="4"
+                              stroke="currentColor" stroke-width="1.5"/>
+                        <rect x="4"  y="36" width="24" height="24" rx="4"
+                              stroke="currentColor" stroke-width="1.5"/>
+                        <rect x="36" y="36" width="24" height="24" rx="4"
+                              stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    <p>Kéo thành phần vào đây<br>hoặc tạo roadmap mới</p>
+                </div>
+
+                <!-- Zoom badge -->
+                <div id="zoom-badge">100%</div>
+
+                <!-- Hint bar -->
+                <div id="hint-bar">
+                    Kéo thả để thêm &nbsp;·&nbsp; Click nền để di chuyển &nbsp;·&nbsp; Ctrl + Scroll để zoom
+                </div>
+
+                <!-- Mini toolbar -->
+                <div id="mini-toolbar">
+                    <button class="mt-btn" id="mt-zoom-reset">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                        <span>Reset zoom</span>
+                    </button>
+                    <div class="mt-sep"></div>
+                    <button class="mt-btn mt-btn--danger" id="mt-clear">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6M14 11v6"/>
+                        </svg>
+                        <span>Xóa tất cả</span>
+                    </button>
+                </div>
+
+                <!-- AI Toggle button -->
+                <button id="rm-ai-toggle" title="AI Edit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    AI Edit
+                </button>
+
+                <!-- AI Bar -->
+                <div id="rm-ai-bar" class="rm-ai-bar--hidden">
+                    <svg class="rm-ai-bar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    <textarea id="rm-ai-input" placeholder="Mô tả thay đổi bạn muốn... (Enter để gửi)" rows="1"></textarea>
+                    <button id="rm-ai-send">
+                        <svg id="rm-ai-send-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                        <div class="rm-ai-spinner"></div>
+                    </button>
+                </div>
+
+                <!-- Preview Banner -->
+                <div id="rm-preview-banner" class="rm-preview-banner--hidden">
+                    <div class="rm-preview-banner__label">
+                        <div class="rm-preview-banner__dot"></div>
+                        <span class="rm-preview-banner__text">Xem trước thay đổi AI</span>
+                    </div>
+                    <div class="rm-preview-banner__actions">
+                        <button id="rm-preview-cancel" class="rm-preview-banner__btn rm-preview-banner__btn--cancel">Huỷ</button>
+                        <button id="rm-preview-save"   class="rm-preview-banner__btn rm-preview-banner__btn--save">Lưu</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save status overlay (top-right of canvas) -->
+            <div id="rm-save-status" class="rm-save-status">
+                <span id="rm-save-dot" class="rm-save-dot"></span>
+                <span id="rm-save-label" class="rm-save-label"></span>
+            </div>
+        </main>
+
+        <!-- COMBINED RIGHT PANEL: Roadmaps (top) + Components (bottom) -->
+        <div id="sb-combined">
+
+            <!-- TOP: Saved roadmaps -->
+            <div id="sb-right">
+                <div class="sb-head sb-head--between">
+                    <span class="sb-head-title">Roadmaps</span>
+                    <button id="btn-new-rm" class="btn-new-rm" title="Tạo roadmap mới">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                             stroke-linecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5"  y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Tạo mới
+                    </button>
+                </div>
+                <div class="sb-body" id="sb-right-body">
+                    <!-- skeleton: replaced by JS after fetch -->
+                    <div class="rm-list-skeleton" aria-hidden="true" id="rm-list-skeleton">
+                        <div class="rm-list-skeleton-item">
+                            <div class="sk-row"><span class="sk-dot rm-skeleton"></span><span class="sk-line rm-skeleton" style="width:65%;height:10px"></span></div>
+                            <div class="sk-row"><span class="sk-meta rm-skeleton" style="width:80%;height:8px"></span></div>
+                        </div>
+                        <div class="rm-list-skeleton-item">
+                            <div class="sk-row"><span class="sk-dot rm-skeleton"></span><span class="sk-line rm-skeleton" style="width:50%;height:10px"></span></div>
+                            <div class="sk-row"><span class="sk-meta rm-skeleton" style="width:70%;height:8px"></span></div>
+                        </div>
+                        <div class="rm-list-skeleton-item">
+                            <div class="sk-row"><span class="sk-dot rm-skeleton"></span><span class="sk-line rm-skeleton" style="width:75%;height:10px"></span></div>
+                            <div class="sk-row"><span class="sk-meta rm-skeleton" style="width:60%;height:8px"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESIZER drag handle -->
+            <div class="rm-resizer" id="rm-resizer">
+                <div class="rm-resizer-handle"></div>
+            </div>
+
+            <!-- BOTTOM: Components / folder tree -->
+            <div id="sb-left">
+                <div class="sb-head">
+                    <span class="sb-head-title" data-i18n="roadmap.components">Thành phần</span>
+                </div>
+                <div class="sb-search-wrap">
+                    <svg class="sb-search-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input id="sb-search" class="sb-search-input"
+                           placeholder="Tìm thành phần…" type="search" autocomplete="off">
+                </div>
+                <div class="sb-body">
+                    <ul id="rm-item-list" class="list-wrapper"></ul>
+                </div>
+            </div>
+
+        </div><!-- /#sb-combined -->
+
+    </div><!-- /#rm-app -->
+
+    <!-- ── MOBILE BOTTOM BAR (inside body, outside #rm-app) ─────── -->
+    <div id="rm-mobile-bar">
+        <!-- Toggle left sidebar -->
+        <button class="mob-tog" id="mob-btn-left" aria-label="Thành phần">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span data-i18n="roadmap.mob_components">Thành phần</span>
+        </button>
+
+        <!-- Toggle right sidebar -->
+        <button class="mob-tog" id="mob-btn-right" aria-label="Roadmaps">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="9" y1="13" x2="15" y2="13"/>
+                <line x1="9" y1="17" x2="12" y2="17"/>
+            </svg>
+            <span data-i18n="roadmap.mob_roadmaps">Roadmaps</span>
+        </button>
+    </div>
+
+    <!-- ── EDGE EDIT POPUP ─────────────────────────────────────── -->
+    <div id="edge-popup">
+        <button class="ep-close" id="ep-close" aria-label="Đóng">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6"  y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+        <h4 class="ep-title">Chỉnh sửa kết nối</h4>
+
+        <div class="ep-row">
+            <span class="ep-label">Mũi tên</span>
+            <div class="ep-btns">
+                <button class="ep-b" id="epa-none" title="Không mũi tên">
+                    <svg viewBox="0 0 28 8" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="0" y1="4" x2="28" y2="4"/>
+                    </svg>
+                </button>
+                <button class="ep-b" id="epa-one" title="Một chiều">
+                    <svg viewBox="0 0 28 10" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round">
+                        <line x1="0" y1="5" x2="22" y2="5"/>
+                        <polyline points="16,1 22,5 16,9"/>
+                    </svg>
+                </button>
+                <button class="ep-b" id="epa-two" title="Hai chiều">
+                    <svg viewBox="0 0 28 10" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round">
+                        <line x1="6" y1="5" x2="22" y2="5"/>
+                        <polyline points="12,1 6,5 12,9"/>
+                        <polyline points="16,1 22,5 16,9"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="ep-row">
+            <span class="ep-label">Kiểu đường</span>
+            <div class="ep-btns">
+                <button class="ep-b" id="eps-solid" title="Liền">
+                    <svg viewBox="0 0 28 8" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="0" y1="4" x2="28" y2="4"/>
+                    </svg>
+                </button>
+                <button class="ep-b" id="eps-dashed" title="Nét đứt">
+                    <svg viewBox="0 0 28 8" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-dasharray="5,3">
+                        <line x1="0" y1="4" x2="28" y2="4"/>
+                    </svg>
+                </button>
+                <button class="ep-b" id="eps-dotted" title="Chấm chấm">
+                    <svg viewBox="0 0 28 8" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-dasharray="1,4" stroke-linecap="round">
+                        <line x1="0" y1="4" x2="28" y2="4"/>
+                    </svg>
+                </button>
+                <button class="ep-b" id="eps-faded" title="Mờ">
+                    <svg viewBox="0 0 28 8" fill="none" stroke="currentColor"
+                         stroke-width="2" opacity="0.3">
+                        <line x1="0" y1="4" x2="28" y2="4"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="ep-row ep-row--label">
+            <span class="ep-label">Tên</span>
+            <input class="ep-input" id="ep-label-input" placeholder="(bỏ trống)">
+        </div>
+
+        <button class="ep-del" id="ep-del">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+            </svg>
+            Xóa kết nối này
+        </button>
+    </div>
+
+    </div><!-- /.app-content -->
+
+</body>
+</html>

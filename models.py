@@ -100,12 +100,17 @@ class Task(Base):  # TASK TRONG PROJECT
     # Notes
     notes = Column(Text, default="", nullable=False)
     progress = Column(Integer, default=0, nullable=False)
+    
+    # Tình trạng hoàn thành và đánh giá độ khó
+    is_completed = Column(Boolean, default=False, nullable=False)
+    difficulty_rating = Column(Integer, default=0, nullable=False)
 
     project = relationship("Item", back_populates="tasks")
     
     __table_args__ = (
         CheckConstraint("priority IN ('high', 'medium', 'low')", name="check_priority"),
         CheckConstraint("time_spent_seconds >= 0", name="check_time_positive"),
+        CheckConstraint("difficulty_rating >= 0 AND difficulty_rating <= 5", name="check_difficulty_rating"),
     )
 
 class TaskHistory(Base):

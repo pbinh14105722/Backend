@@ -352,6 +352,8 @@ class ChatMessageSend(BaseModel):
     """POST /chatbot — Gửi tin nhắn"""
     message: str = Field(..., min_length=1, description="Nội dung tin nhắn, không được rỗng")
     project_id: Optional[str] = Field(None, description="ID của project đang mở (dùng cho auto-apply filter)")
+    history: list = Field(default_factory=list, description="Lịch sử hội thoại từ frontend [{role, message}]")
+    source: Optional[str] = Field(None, description="Nguồn gọi: 'roadmap' → không lưu lịch sử vào DB")
 
 class TaskBreakdownRequest(BaseModel):
     """POST /chatbot/breakdown — Yêu cầu chia nhỏ task"""

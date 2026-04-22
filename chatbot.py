@@ -632,10 +632,9 @@ def send_message(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    POST /chatbot
-    - Roadmap context ([ROADMAP_CONTEXT]...[/ROADMAP_CONTEXT]): ephemeral mode —
-      gọi AI và trả kết quả trực tiếp, KHÔNG lưu vào ChatMessage.
-    - Chatbot thường: lưu user message + AI response vào DB như cũ.
+    POST /chatbot — Hoàn toàn ephemeral, không lưu DB.
+    Frontend truyền history trong body để AI có context đa lượt.
+    Trả kết quả AI trực tiếp trong response body.
     """
     if not data.message or not data.message.strip():
         raise HTTPException(
@@ -643,58 +642,18 @@ def send_message(
             detail="Message không được rỗng"
         )
 
-    roadmap_context, clean_message = extract_roadmap_context(data.message)
-    is_roadmap = roadmap_context is not None
+    _, clean_message = extract_roadmap_context(data.message)
 
-    print(f"[CHATBOT] POST - User {current_user.id} | roadmap={is_roadmap}: {clean_message[:60]}...")
+    print(f"[CHATBOT] POST - User {current_user.id}: {clean_message[:60]}...")
 
     user_context = get_user_context(current_user.id, db)
 
-    # ── EPHEMERAL MODE (roadmap AI) ────────────────────────────────────────
-    # Không lưu DB, trả kết quả trực tiếp trong body để frontend không cần poll.
-    if is_roadmap:
-        try:
-            ai_response = call_claude_api(clean_message, [], user_context)
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Lỗi khi gọi AI: {str(e)}")
-
-        print(f"[CHATBOT] ephemeral ✅ type={ai_response['type']}, has_data={ai_response['data'] is not None}")
-        return {
-            "message": ai_response["message"],
-            "type":    ai_response["type"],
-            "data":    ai_response["data"],
-        }
-
-    # ── PERSISTENT MODE (chatbot page) ────────────────────────────────────
-    enforce_history_limit(current_user.id, db)
-
-    user_msg = models.ChatMessage(
-        id=str(uuid.uuid4()),
-        user_id=current_user.id,
-        role="user",
-        message=data.message,
-        type=None,
-        data=None,
-        created_at=datetime.now(timezone.utc)
-    )
-    db.add(user_msg)
-
-    try:
-        db.commit()
-        print(f"[CHATBOT] ✅ User message saved: {user_msg.id}")
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu tin nhắn: {str(e)}")
-
-    history_msgs = db.query(models.ChatMessage).filter(
-        models.ChatMessage.user_id == current_user.id
-    ).order_by(models.ChatMessage.created_at.asc()).all()
-
-    history = []
-    for msg in history_msgs[:-1]:
-        history.append({"role": msg.role, "message": msg.message})
+    # Dùng history từ frontend body (tối đa 20 lượt gần nhất)
+    history = [
+        {"role": m.get("role", "user"), "message": m.get("message") or m.get("content", "")}
+        for m in (data.history or [])[-20:]
+        if m.get("role") in ("user", "assistant")
+    ]
 
     try:
         ai_response = call_claude_api(clean_message, history, user_context)
@@ -703,14 +662,7 @@ def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi gọi AI: {str(e)}")
 
-    enforce_history_limit(current_user.id, db)
-
-    if ai_response["type"] in ("roadmap", "folder_tree") and not ai_response["data"]:
-        print(f"[CHATBOT] ⚠️ AI returned type={ai_response['type']} but no data! Fallback to None")
-        ai_response["type"] = None
-        ai_response["data"] = None
-
-    # AUTO-APPLY FILTER
+    # AUTO-APPLY FILTER (không cần lưu DB, vẫn cần ghi FilterSettings)
     if ai_response["type"] == "filter" and ai_response["data"] and data.project_id:
         try:
             filter_data = ai_response["data"]
@@ -719,13 +671,11 @@ def send_message(
                 models.Item.type == "PROJECT",
                 models.Item.owner_id == current_user.id
             ).first()
-
             if project:
                 settings = db.query(models.FilterSettings).filter(
                     models.FilterSettings.project_id == data.project_id,
                     models.FilterSettings.user_id == current_user.id
                 ).first()
-
                 if not settings:
                     settings = models.FilterSettings(
                         user_id=current_user.id,
@@ -737,8 +687,7 @@ def send_message(
                 else:
                     settings.enabled = True
                     settings.filter_config = json.dumps(filter_data)
-
-                db.flush()
+                db.commit()
                 print(f"[CHATBOT] ✅ Auto-applied filter to project {data.project_id}")
                 ai_response["type"] = "filter_applied"
                 ai_response["data"] = {
@@ -746,29 +695,16 @@ def send_message(
                     "filters_count": len(filter_data.get("filters", [])),
                     "logic": filter_data.get("logic", "and")
                 }
-            else:
-                print(f"[CHATBOT] ⚠️ Project {data.project_id} not found, skip auto-apply")
         except Exception as e:
+            db.rollback()
             print(f"[CHATBOT] ⚠️ Auto-apply filter failed: {str(e)}")
 
-    ai_msg = models.ChatMessage(
-        id=str(uuid.uuid4()),
-        user_id=current_user.id,
-        role="assistant",
-        message=ai_response["message"],
-        type=ai_response["type"],
-        data=json.dumps(ai_response["data"]) if ai_response["data"] else None,
-        created_at=datetime.now(timezone.utc)
-    )
-    db.add(ai_msg)
-
-    try:
-        db.commit()
-        print(f"[CHATBOT] ✅ AI response saved: {ai_msg.id}, type={ai_msg.type}")
-        return {"status": "received"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu phản hồi AI: {str(e)}")
+    print(f"[CHATBOT] ✅ type={ai_response['type']}, has_data={ai_response['data'] is not None}")
+    return {
+        "message": ai_response["message"],
+        "type":    ai_response["type"],
+        "data":    ai_response["data"],
+    }
 
 
 @router.get("/chatbot", summary="Lấy phản hồi AI mới nhất")

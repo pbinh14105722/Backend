@@ -140,7 +140,7 @@ def extract_roadmap_context(message: str):
     return None, message
 
 
-def call_claude_api(user_message: str, history: list, user_context: str) -> dict:
+def call_claude_api(user_message: str, history: list, user_context: str, roadmap_ctx: Optional[dict] = None) -> dict:
     """
     Gọi Claude API và trả về response có cấu trúc:
     { "message": str, "type": str|None, "data": dict|None }
@@ -172,7 +172,42 @@ def call_claude_api(user_message: str, history: list, user_context: str) -> dict
     vi_templates = templates['vi']
     en_templates = templates['en']
 
-    system_prompt = f"""You are Manask AI — a smart, proactive assistant built into the Manask task management application.
+    # ── FORCED ROADMAP MODE ────────────────────────────────────────────────
+    # Khi message có marker [ROADMAP_CONTEXT] (đã strip ở extract_roadmap_context),
+    # bắt buộc AI trả type='roadmap' (context rỗng → tạo mới) hoặc 'roadmap_update' (có nodes → diff).
+    roadmap_mode_block = ""
+    if roadmap_ctx is not None:
+        has_nodes = bool(roadmap_ctx) and bool(roadmap_ctx.get("nodes"))
+        forced_type = "roadmap_update" if has_nodes else "roadmap"
+        ctx_summary = ""
+        if has_nodes:
+            try:
+                summary_nodes = {
+                    k: {
+                        "title": (v.get("item") or {}).get("name") or v.get("title"),
+                        "type":  (v.get("item") or {}).get("type"),
+                        "parent": (v.get("item") or {}).get("parent_id"),
+                    }
+                    for k, v in (roadmap_ctx.get("nodes") or {}).items()
+                }
+                ctx_summary = json.dumps({
+                    "title": roadmap_ctx.get("title"),
+                    "nodes": summary_nodes,
+                    "edges": roadmap_ctx.get("edges") or [],
+                }, ensure_ascii=False)[:4000]
+            except Exception:
+                ctx_summary = ""
+        roadmap_mode_block = f"""
+⚠️ ROADMAP MODE — MANDATORY OVERRIDE (highest priority):
+- The user is interacting via a roadmap quick-prompt UI. ANY input must be interpreted as a roadmap creation/edit request.
+- You MUST return type="{forced_type}". Do NOT return type=null. Do NOT return chat. Do NOT ask clarifying questions.
+- Even if the user only types a topic like "học tiếng anh" / "ielts" / "python" / "marketing 6 tháng" → treat it as a roadmap idea and generate a complete roadmap.
+- If the user input is empty or nonsense, still produce a generic roadmap with a sensible default title and basic phases.
+- {"Roadmap context provided — generate roadmap_update.diff to modify it. Current roadmap: " + ctx_summary if has_nodes else "No existing roadmap context — generate a brand new roadmap from scratch."}
+
+"""
+
+    system_prompt = f"""{roadmap_mode_block}You are Manask AI — a smart, proactive assistant built into the Manask task management application.
 Help users organize work, visualize projects, analyze progress, and find tasks efficiently.
 You have access to the user's workspace data below. Use it for precise, personalized answers.
 
@@ -708,7 +743,7 @@ def send_message(
             detail="Message không được rỗng"
         )
 
-    _, clean_message = extract_roadmap_context(data.message)
+    roadmap_ctx, clean_message = extract_roadmap_context(data.message)
 
     print(f"[CHATBOT] POST - User {current_user.id}: {clean_message[:60]}...")
 
@@ -734,7 +769,7 @@ def send_message(
     db.flush()
 
     try:
-        ai_response = call_claude_api(clean_message, history, user_context)
+        ai_response = call_claude_api(clean_message, history, user_context, roadmap_ctx=roadmap_ctx)
     except HTTPException:
         raise
     except Exception as e:

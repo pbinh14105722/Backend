@@ -347,7 +347,7 @@ MESSAGE: Vietnamese → "✅ Đã cập nhật roadmap **[name]**: [mô tả ng�
          English   → "✅ Updated roadmap **[name]**: [short description]."
 
 # SECTION 6 — SMART ANALYSIS
-type = "statistic", data = null
+type = "statistic", data = null 
 
 TRIGGERS: "summarize", "analyze", "how am I doing", "report", "overdue", "progress", "time spent", "trễ", "chậm", "sắp đến hạn", "late", "behind"
 
@@ -698,7 +698,7 @@ def send_message(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    POST /chatbot — Hoàn toàn ephemeral, không lưu DB.
+    POST /chatbot — Lưu user + assistant message vào DB (giới hạn 50 tin gần nhất).
     Frontend truyền history trong body để AI có context đa lượt.
     Trả kết quả AI trực tiếp trong response body.
     """
@@ -720,6 +720,17 @@ def send_message(
         for m in (data.history or [])[-20:]
         if m.get("role") in ("user", "assistant")
     ]
+
+    enforce_history_limit(current_user.id, db)
+    user_msg = models.ChatMessage(
+        user_id=current_user.id,
+        role="user",
+        message=clean_message,
+        type=None,
+        data=None,
+    )
+    db.add(user_msg)
+    db.flush()
 
     try:
         ai_response = call_claude_api(clean_message, history, user_context)
@@ -766,6 +777,22 @@ def send_message(
             print(f"[CHATBOT] ⚠️ Auto-apply filter failed: {str(e)}")
 
     print(f"[CHATBOT] ✅ type={ai_response['type']}, has_data={ai_response['data'] is not None}")
+
+    enforce_history_limit(current_user.id, db)
+    assistant_msg = models.ChatMessage(
+        user_id=current_user.id,
+        role="assistant",
+        message=ai_response["message"],
+        type=ai_response["type"],
+        data=json.dumps(ai_response["data"]) if ai_response["data"] is not None else None,
+    )
+    db.add(assistant_msg)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[CHATBOT] ⚠️ Failed to persist history: {e}")
+
     return {
         "message": ai_response["message"],
         "type":    ai_response["type"],

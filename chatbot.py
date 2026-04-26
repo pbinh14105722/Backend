@@ -728,6 +728,7 @@ def send_message(
         message=clean_message,
         type=None,
         data=None,
+        created_at=datetime.now(timezone.utc),
     )
     db.add(user_msg)
     db.flush()
@@ -785,6 +786,7 @@ def send_message(
         message=ai_response["message"],
         type=ai_response["type"],
         data=json.dumps(ai_response["data"]) if ai_response["data"] is not None else None,
+        created_at=datetime.now(timezone.utc),
     )
     db.add(assistant_msg)
     try:

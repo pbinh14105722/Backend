@@ -26,7 +26,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Cấu hình CORS
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+_origins_raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _origins_raw:
+    allowed_origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
+else:
+    print("⚠️  WARNING: ALLOWED_ORIGINS not set — CORS defaults to '*'. Set this env var in production.")
+    allowed_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins, # Cho phép các nguồn từ .env

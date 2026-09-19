@@ -1,58 +1,16 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 from typing import List
 
 import models, database, schemas
 from schemas import SortRule, validate_sort_rules
-from utils import SECRET_KEY, ALGORITHM
+from dependencies import get_current_user, verify_project_owner
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-# ========== AUTH ==========
-
-def get_current_user(
-    db: Session = Depends(database.get_db),
-    token: str = Depends(oauth2_scheme)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Không thể xác thực thông tin",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 
 # ========== HELPERS ==========
-
-def verify_project_owner(project_id: str, user_id: int, db: Session):
-    project = db.query(models.Item).filter(
-        models.Item.id == project_id,
-        models.Item.type == "PROJECT",
-        models.Item.owner_id == user_id
-    ).first()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project không tồn tại hoặc bạn không có quyền truy cập"
-        )
-    return project
-
 
 def get_or_create_sort_settings(project_id: str, user_id: int, db: Session) -> models.SortSettings:
     settings = db.query(models.SortSettings).filter(

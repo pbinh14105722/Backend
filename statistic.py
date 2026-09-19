@@ -1,39 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 from datetime import datetime, timezone, timedelta, date
 from collections import defaultdict
 import hashlib
 import models, database
-from utils import SECRET_KEY, ALGORITHM
+from dependencies import get_current_user
 
 router = APIRouter(prefix="/statistic")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-# ========== AUTH ==========
-def get_current_user(
-    db: Session = Depends(database.get_db),
-    token: str = Depends(oauth2_scheme)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 
 # ========== HELPERS ==========

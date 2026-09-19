@@ -9,15 +9,10 @@ All sensitive credentials are loaded from environment variables.
 import os
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
 from dotenv import load_dotenv
-
-from utils import SECRET_KEY, ALGORITHM
 
 # Load environment variables
 load_dotenv()
@@ -70,9 +65,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base class for models
 Base = declarative_base()
 
-# OAuth2 scheme for JWT authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
 # =============================================================================
 # DATABASE DEPENDENCY INJECTION
 # =============================================================================
@@ -101,58 +93,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 # =============================================================================
-# AUTHENTICATION DEPENDENCY (Legacy - Consider moving to dependencies.py)
-# =============================================================================
-
-def get_current_user(
-    db: Session = Depends(get_db), 
-    token: str = Depends(oauth2_scheme)
-):
-    """
-    Extract and validate the current user from JWT token.
-    
-    This dependency decodes the JWT token, validates it, and returns
-    the corresponding User object from the database.
-    
-    Args:
-        db: Database session (injected)
-        token: JWT token from Authorization header (injected)
-        
-    Returns:
-        models.User: The authenticated user object
-        
-    Raises:
-        HTTPException 401: If token is invalid or user not found
-        
-    Note:
-        Consider moving this to dependencies.py for better organization
-        (as per the project's clean architecture pattern)
-    """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Không thể xác thực thông tin",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    
-    # Import here to avoid circular import
-    import models
-    
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
-        raise credentials_exception
-    
-    return user
-
-
-# =============================================================================
 # HEALTH CHECK & VALIDATION
 # =============================================================================
 
@@ -170,7 +110,7 @@ def validate_database_connection() -> dict:
     try:
         db = SessionLocal()
         # Try a simple query
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return {
             "status": "✅ Connected",

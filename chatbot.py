@@ -1,17 +1,24 @@
 import json
 import re
 import uuid
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
-import anthropic
 
 import models, database, schemas
 from fastapi.responses import JSONResponse
 from dependencies import get_current_user
+from ai_client import get_ai_provider
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# ── AI Provider singleton ─────────────────────────────────────────────────────
+# Khởi tạo một lần khi module load — không tạo lại client mỗi request
+_provider = get_ai_provider()
+# ──────────────────────────────────────────────────────────────────────────────
 
 # Giới hạn lịch sử hội thoại
 HISTORY_LIMIT = 50
@@ -56,7 +63,7 @@ def enforce_history_limit(user_id: int, db: Session):
         if oldest:
             db.delete(oldest)
             db.flush()
-            print(f"[CHATBOT] 🗑️ Auto-deleted oldest message (id: {oldest.id}) - Limit reached")
+            logger.debug(f"[CHATBOT] 🗑️ Auto-deleted oldest message (id: {oldest.id}) - Limit reached")
 
 
 def get_user_context(user_id: int, db: Session) -> str:
@@ -70,9 +77,10 @@ def get_user_context(user_id: int, db: Session) -> str:
     project_ids = [i.id for i in items if i.type == 'PROJECT']
     tasks = []
     if project_ids:
+        # Giới hạn 200 tasks để tránh context window quá lớn (chi phí + latency)
         tasks = db.query(models.Task).filter(
             models.Task.project_id.in_(project_ids)
-        ).all()
+        ).limit(200).all()
 
     # Format context
     context_parts = []
@@ -122,7 +130,6 @@ def call_claude_api(user_message: str, history: list, user_context: str, roadmap
     ✅ IMPROVED: Validation AI output structure
     ✅ IMPROVED: Debug logging
     """
-    client = anthropic.Anthropic(api_key=database.ANTHROPIC_API_KEY)
 
     # Language-specific templates (will be chosen by Claude based on detected language)
     templates = {
@@ -431,25 +438,22 @@ Only use colors from this exact list:
     messages.append({"role": "user", "content": user_message})
 
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16000,  # ✅ Tăng từ 2048 → 4096 để đủ cho folder tree lớn
+        raw_text = _provider.chat(
+            messages=messages,
             system=system_prompt,
-            messages=messages
+            max_tokens=16000,
         )
-
-        raw_text = response.content[0].text.strip()
         
         # ✅ Debug: Log raw response length
-        print(f"[CHATBOT] 📝 AI raw response: {len(raw_text)} chars")
-        print(f"[CHATBOT] 📝 Raw response tail: ...{raw_text[-200:]}")
+        logger.debug(f"[CHATBOT] 📝 AI raw response: {len(raw_text)} chars")
+        logger.debug(f"[CHATBOT] 📝 Raw response tail: ...{raw_text[-200:]}")
 
         # Parse JSON response
         try:
             result = json.loads(raw_text)
         except json.JSONDecodeError as e:
-            print(f"[CHATBOT] ❌ JSON parse error: {str(e)}")
-            print(f"[CHATBOT] Raw text preview: {raw_text[:200]}...")
+            logger.error(f"[CHATBOT] ❌ JSON parse error: {str(e)}")
+            logger.debug(f"[CHATBOT] Raw text preview: {raw_text[:200]}...")
     
             # Thử tìm JSON object trong text
             import re
@@ -457,7 +461,7 @@ Only use colors from this exact list:
             if json_match:
                 try:
                     result = json.loads(json_match.group())
-                    print(f"[CHATBOT] ✅ Extracted JSON from raw text")
+                    logger.info(f"[CHATBOT] ✅ Extracted JSON from raw text")
                 except:
                     result = {"message": raw_text, "type": None, "data": None}
             else:
@@ -469,13 +473,13 @@ Only use colors from this exact list:
         msg_data = result.get("data")
         
         # ✅ Debug: Log parsed response
-        print(f"[CHATBOT] 🤖 AI Response parsed:")
-        print(f"  - Type: {msg_type}")
-        print(f"  - Has data: {msg_data is not None}")
+        logger.debug(f"[CHATBOT] 🤖 AI Response parsed:")
+        logger.debug(f"  - Type: {msg_type}")
+        logger.debug(f"  - Has data: {msg_data is not None}")
 
         # Validate type
         if msg_type not in (None, "folder_tree", "roadmap", "roadmap_update", "statistic", "filter", "filter_applied"):
-            print(f"[CHATBOT] ⚠️ Invalid type '{msg_type}', fallback to None")
+            logger.warning(f"[CHATBOT] ⚠️ Invalid type '{msg_type}', fallback to None")
             msg_type = None
 
         # Validate data
@@ -485,17 +489,17 @@ Only use colors from this exact list:
         # ✅ Validate folder_tree structure
         if msg_type == "folder_tree" and msg_data:
             tree = msg_data.get("tree", [])
-            print(f"[CHATBOT]   - Tree items: {len(tree)}")
+            logger.debug(f"[CHATBOT]   - Tree items: {len(tree)}")
             
             folders = [i for i in tree if i.get("type") == "FOLDER"]
             projects = [i for i in tree if i.get("type") == "PROJECT"]
             tasks = [i for i in tree if i.get("type") == "TASK"]
             
-            print(f"[CHATBOT]   - Folders: {len(folders)}, Projects: {len(projects)}, Tasks: {len(tasks)}")
+            logger.debug(f"[CHATBOT]   - Folders: {len(folders)}, Projects: {len(projects)}, Tasks: {len(tasks)}")
             
             # Must have at least 1 folder and 1 project
             if len(folders) < 1 or len(projects) < 1:
-                print(f"[CHATBOT] ⚠️ folder_tree invalid: need 1+ folder and 1+ project, fallback to None")
+                logger.warning(f"[CHATBOT] ⚠️ folder_tree invalid: need 1+ folder and 1+ project, fallback to None")
                 msg_type = None
                 msg_data = None
             else:
@@ -509,11 +513,11 @@ Only use colors from this exact list:
             nodes = msg_data.get("nodes", {})
             edges = msg_data.get("edges", [])
             
-            print(f"[CHATBOT]   - Nodes: {len(nodes)}, Edges: {len(edges)}")
+            logger.debug(f"[CHATBOT]   - Nodes: {len(nodes)}, Edges: {len(edges)}")
             
             # Must have at least 2 nodes
             if len(nodes) < 2:
-                print(f"[CHATBOT] ⚠️ Roadmap invalid: need 2+ nodes, fallback to None")
+                logger.warning(f"[CHATBOT] ⚠️ Roadmap invalid: need 2+ nodes, fallback to None")
                 msg_type = None
                 msg_data = None
             else:
@@ -526,7 +530,7 @@ Only use colors from this exact list:
         if msg_type == "roadmap_update" and msg_data:
             diff = msg_data.get("diff")
             if not diff or not msg_data.get("target_roadmap_id"):
-                print(f"[CHATBOT] ⚠️ roadmap_update invalid: missing diff or target_roadmap_id, fallback to None")
+                logger.warning(f"[CHATBOT] ⚠️ roadmap_update invalid: missing diff or target_roadmap_id, fallback to None")
                 msg_type = None
                 msg_data = None
             else:
@@ -542,14 +546,14 @@ Only use colors from this exact list:
                     if "item" in node and "color" in node["item"]:
                         node["item"]["color"] = validate_color(node["item"].get("color"))
 
-                print(f"[CHATBOT]   - roadmap_update diff keys: add_nodes={len(diff['add_nodes'])}, "
+                logger.debug(f"[CHATBOT]   - roadmap_update diff keys: add_nodes={len(diff['add_nodes'])}, "
                       f"update_nodes={len(diff['update_nodes'])}, delete_nodes={len(diff['delete_nodes'])}, "
                       f"add_edges={len(diff['add_edges'])}, delete_edges={len(diff['delete_edges'])}")
 
         # ✅ Validate filter structure
         if msg_type == "filter" and msg_data:
             if "logic" not in msg_data or "filters" not in msg_data:
-                print(f"[CHATBOT] ⚠️ filter invalid: missing logic or filters, fallback to None")
+                logger.warning(f"[CHATBOT] ⚠️ filter invalid: missing logic or filters, fallback to None")
                 msg_type = None
                 msg_data = None
 
@@ -560,7 +564,7 @@ Only use colors from this exact list:
         }
 
     except Exception as e:
-        print(f"[CHATBOT] Claude API error: {str(e)}")
+        logger.error(f"[CHATBOT] Claude API error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi khi gọi AI: {str(e)}"
@@ -584,63 +588,16 @@ def estimate_task_difficulty(
     Returns:
         Số nguyên từ 1 đến 5. Trả về 3 (Medium) nếu có lỗi.
     """
-    client = anthropic.Anthropic(api_key=database.ANTHROPIC_API_KEY)
-
-    system_prompt = """You are an expert task difficulty estimator embedded in a project management tool.
-
-Your job: given a task name and its project context, assign a difficulty score from 1 to 5.
-
-SCALE:
-1 — Trivial    : Simple lookup, copy-paste, or single-click action. < 30 min.
-2 — Easy       : Straightforward with a clear single step. 30 min – 2 hrs.
-3 — Medium     : Requires planning or multiple steps. 2–8 hrs.
-4 — Hard       : Complex logic, coordination, or significant research. 1–3 days.
-5 — Very Hard  : High uncertainty, cross-team dependency, or architectural impact. > 3 days.
-
-SCORING GUIDELINES:
-- Anchor your estimate to the other tasks in the project. If most tasks are complex (4–5), a "write unit test" task is relatively easy (2).
-- Use time_spent of completed tasks as a calibration signal: longer time = harder.
-- Prioritise the semantic meaning of the task name over surface length.
-- "high" priority tasks tend to be harder, but not always — use it as a weak signal only.
-
-RESPONSE FORMAT:
-Respond with ONLY a raw JSON object. No markdown, no explanation.
-{"estimated_difficulty": <integer 1-5>, "reasoning": "<one sentence>"}"""
-
-    has_context = context_details and context_details.strip()
-    project_line = f"Project: {project_name}\n" if project_name else ""
-
-    user_message = f"""{project_line}Task to estimate: "{current_task_name}"
-
-Other tasks in this project for calibration:
-{context_details.strip() if has_context else "(none — estimate from task name and project name alone)"}"""
-
+    # System prompt và API call đã được chuyển vào ClaudeProvider.estimate_difficulty()
     try:
-        response = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=120,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
+        return _provider.estimate_difficulty(
+            task_name=current_task_name,
+            context=context_details or "",
+            project_name=project_name,
         )
-
-        raw_text = response.content[0].text.strip()
-        print(f"[AI ESTIMATE] Raw response: {raw_text}")
-
-        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group())
-            diff = int(data.get("estimated_difficulty", 3))
-            reasoning = data.get("reasoning", "")
-            print(f"[AI ESTIMATE] Result: {diff}/5 — {reasoning}")
-            return max(1, min(5, diff))
-
-        print(f"[AI ESTIMATE] ⚠️ Could not parse JSON from response, fallback to 3")
+    except Exception as exc:
+        logger.error(f"[CHATBOT] estimate_difficulty error: {exc}")
         return 3
-
-    except Exception as e:
-        print(f"[AI ESTIMATE] ❌ Error: {e}")
-        return 3
-
 
 # ========== ROUTES ==========
 
@@ -717,7 +674,7 @@ def send_message(
 
     roadmap_ctx, clean_message = extract_roadmap_context(data.message)
 
-    print(f"[CHATBOT] POST - User {current_user.id}: {clean_message[:60]}...")
+    logger.info(f"[CHATBOT] POST - User {current_user.id}: {clean_message[:60]}...")
 
     user_context = get_user_context(current_user.id, db)
 
@@ -773,7 +730,7 @@ def send_message(
                     settings.enabled = True
                     settings.filter_config = json.dumps(filter_data)
                 db.commit()
-                print(f"[CHATBOT] ✅ Auto-applied filter to project {data.project_id}")
+                logger.info(f"[CHATBOT] ✅ Auto-applied filter to project {data.project_id}")
                 ai_response["type"] = "filter_applied"
                 ai_response["data"] = {
                     "project_id": data.project_id,
@@ -782,9 +739,9 @@ def send_message(
                 }
         except Exception as e:
             db.rollback()
-            print(f"[CHATBOT] ⚠️ Auto-apply filter failed: {str(e)}")
+            logger.warning(f"[CHATBOT] ⚠️ Auto-apply filter failed: {str(e)}")
 
-    print(f"[CHATBOT] ✅ type={ai_response['type']}, has_data={ai_response['data'] is not None}")
+    logger.info(f"[CHATBOT] ✅ type={ai_response['type']}, has_data={ai_response['data'] is not None}")
 
     enforce_history_limit(current_user.id, db)
     assistant_msg = models.ChatMessage(
@@ -800,7 +757,7 @@ def send_message(
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"[CHATBOT] ⚠️ Failed to persist history: {e}")
+        logger.warning(f"[CHATBOT] ⚠️ Failed to persist history: {e}")
 
     return {
         "message": ai_response["message"],
@@ -821,7 +778,7 @@ def get_latest_response(
     ✅ FIX: Response format match với frontend expectation
     Frontend expect: {role: "assistant", content: "...", type: "...", data: {...}}
     """
-    print(f"[CHATBOT] GET latest - User {current_user.id}")
+    logger.info(f"[CHATBOT] GET latest - User {current_user.id}")
 
     latest = db.query(models.ChatMessage).filter(
         models.ChatMessage.user_id == current_user.id,
@@ -835,9 +792,9 @@ def get_latest_response(
     if latest.data:
         try:
             data = json.loads(latest.data)
-            print(f"[CHATBOT]   - Data parsed successfully, keys: {list(data.keys()) if data else None}")
+            logger.debug(f"[CHATBOT]   - Data parsed successfully, keys: {list(data.keys()) if data else None}")
         except Exception as e:
-            print(f"[CHATBOT]   - Failed to parse data: {e}")
+            logger.warning(f"[CHATBOT]   - Failed to parse data: {e}")
             data = None
 
     # ✅ FIX: Match frontend extractAIMessage() expectation
@@ -849,7 +806,7 @@ def get_latest_response(
         "data": data
     }
     
-    print(f"[CHATBOT]   - Response: type={response['type']}, has_data={response['data'] is not None}")
+    logger.debug(f"[CHATBOT]   - Response: type={response['type']}, has_data={response['data'] is not None}")
     return response
 
 
@@ -865,7 +822,7 @@ def get_history(
     ✅ FIX: Frontend expect ARRAY trực tiếp, không phải object wrapper
     Frontend code: _messages = Array.isArray(data) ? data : [];
     """
-    print(f"[CHATBOT] GET history - User {current_user.id}")
+    logger.info(f"[CHATBOT] GET history - User {current_user.id}")
 
     messages = db.query(models.ChatMessage).filter(
         models.ChatMessage.user_id == current_user.id
@@ -904,7 +861,7 @@ def clear_history(
     DELETE /chatbot
     Xóa toàn bộ lịch sử hội thoại của user. Không thể hoàn tác.
     """
-    print(f"[CHATBOT] DELETE history - User {current_user.id}")
+    logger.info(f"[CHATBOT] DELETE history - User {current_user.id}")
 
     db.query(models.ChatMessage).filter(
         models.ChatMessage.user_id == current_user.id
@@ -912,7 +869,7 @@ def clear_history(
 
     try:
         db.commit()
-        print(f"[CHATBOT] DELETE ✅ History cleared")
+        logger.info(f"[CHATBOT] DELETE ✅ History cleared")
         return {"status": "cleared"}
     except Exception as e:
         db.rollback()
@@ -931,7 +888,7 @@ def save_folder_tree(
     Xử lý theo thứ tự: FOLDER → PROJECT → TASK
     Tự sinh id thật, bỏ qua AI-generated id.
     """
-    print(f"[CHATBOT] SAVE folder-tree - User {current_user.id}, {len(data.tree)} items")
+    logger.info(f"[CHATBOT] SAVE folder-tree - User {current_user.id}, {len(data.tree)} items")
 
     # Map AI id → DB id thật (dùng để resolve parent_id và project_id)
     id_map = {}
@@ -1000,7 +957,7 @@ def save_folder_tree(
         # Resolve project_id thật
         real_project_id = id_map.get(item.project_id)
         if not real_project_id:
-            print(f"[CHATBOT] ⚠️ Task {item.name} có project_id không hợp lệ, bỏ qua")
+            logger.warning(f"[CHATBOT] ⚠️ Task {item.name} có project_id không hợp lệ, bỏ qua")
             continue
 
         # Parse dates
@@ -1033,11 +990,11 @@ def save_folder_tree(
 
     try:
         db.commit()
-        print(f"[CHATBOT] SAVE folder-tree ✅ {saved}")
+        logger.info(f"[CHATBOT] SAVE folder-tree ✅ {saved}")
         return {"saved": saved}
     except Exception as e:
         db.rollback()
-        print(f"[CHATBOT] SAVE folder-tree ❌ {str(e)}")
+        logger.info(f"[CHATBOT] SAVE folder-tree ❌ {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu: {str(e)}")
 
 
@@ -1053,7 +1010,7 @@ def save_roadmap(
     Bỏ qua AI-generated id, tự sinh id thật.
     Dùng name làm tên bản ghi.
     """
-    print(f"[CHATBOT] SAVE roadmap - User {current_user.id}, name={data.name}")
+    logger.info(f"[CHATBOT] SAVE roadmap - User {current_user.id}, name={data.name}")
 
     nodes = data.nodes
     
@@ -1138,7 +1095,7 @@ def save_roadmap(
             real_parent_id = id_map.get(ai_parent_id)
 
             if ai_parent_id and not real_parent_id:
-                print(f"[CHATBOT] ⚠️ SAVE roadmap: PROJECT '{item_data.get('name')}' "
+                logger.warning(f"[CHATBOT] ⚠️ SAVE roadmap: PROJECT '{item_data.get('name')}' "
                       f"có parent_id='{ai_parent_id}' nhưng không tìm thấy FOLDER/PROJECT tương ứng "
                       f"trong roadmap — lưu với parent_id=NULL")
 
@@ -1176,7 +1133,7 @@ def save_roadmap(
 
     # if saved_items > 0:
     db.flush()
-    print(f"[CHATBOT] SAVE roadmap - Auto created {saved_items} real folders/projects.")
+    logger.info(f"[CHATBOT] SAVE roadmap - Auto created {saved_items} real folders/projects.")
     # -----------------------------------------------
 
     # Đảm bảo edge label không bao giờ là null
@@ -1200,7 +1157,7 @@ def save_roadmap(
         db.add(roadmap)
         db.commit()
         # Không cần refresh(roadmap) vì ta trả về danh sách Item
-        print(f"[CHATBOT] SAVE roadmap ✅ Created {len(created_items)} items for roadmap '{roadmap.name}'")
+        logger.info(f"[CHATBOT] SAVE roadmap ✅ Created {len(created_items)} items for roadmap '{roadmap.name}'")
         
         # TRẢ VỀ ĐÚNG TEMPLATE: Mảng các Item mới tạo (chuẩn ItemResponse) + roadmap details
         # Frontend có thể dùng dữ liệu này để push vào Workspace list
@@ -1217,5 +1174,5 @@ def save_roadmap(
         }
     except Exception as e:
         db.rollback()
-        print(f"[CHATBOT] SAVE roadmap ❌ {str(e)}")
+        logger.info(f"[CHATBOT] SAVE roadmap ❌ {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu roadmap: {str(e)}")
